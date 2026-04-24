@@ -1,0 +1,37 @@
+{
+  "user": "Diego",
+  "people": [
+    "Diego",
+    "Sofia",
+    "Carlos",
+    "Emma"
+  ],
+  "currency": "EUR",
+  "settlements": [
+    {
+      "from": "Carlos",
+      "to": "Sofia",
+      "amount": 7.0
+    },
+    {
+      "from": "Carlos",
+      "to": "Diego",
+      "amount": 35.0
+    },
+    {
+      "from": "Sofia",
+      "to": "Diego",
+      "amount": 13.0
+    },
+    {
+      "from": "Emma",
+      "to": "Sofia",
+      "amount": 7.0
+    },
+    {
+      "from": "Emma",
+      "to": "Diego",
+      "amount": 35.0
+    }
+  ]
+}

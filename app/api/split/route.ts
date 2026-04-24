@@ -12,7 +12,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
   let tmpTxtPath = ""
   let tmpJsonPath = ""
   try {
-    const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY })
     const { receipt, participants, voiceInput } = await req.json()
 
     // 1. Construct the natural language text for divider_agent
@@ -46,9 +45,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
 
     // 3. Exec divider_agent python script
     const scriptDir = path.join(process.cwd(), "BUNQ_DIEGO", "divider_agent")
-    const pythonExe = path.join(process.cwd(), "BUNQ_DIEGO", ".venv", "Scripts", "python.exe")
 
-    const cmd = `"${pythonExe}" main.py --file "${tmpTxtPath}" -o "${tmpJsonPath}"`
+    const cmd = `python main.py --file "${tmpTxtPath}" -o "${tmpJsonPath}"`
     const { stdout } = await execAsync(cmd, { cwd: scriptDir })
 
     // 4. Parse result

@@ -778,6 +778,13 @@ if __name__ == "__main__":
         default="Alice",
         help="Your name, passed to Claude as context (default: Alice)",
     )
+    # ── Batch mode args (used by /api/voice Next.js route) ───────────────────
+    parser.add_argument("--batch", action="store_true",
+                        help="Non-interactive mode: reads audio/contacts/payments from files, writes output JSON")
+    parser.add_argument("--audio-file",    type=str, help="Path to audio file (batch mode)")
+    parser.add_argument("--contacts-file", type=str, help="Path to contacts JSON file (batch mode)")
+    parser.add_argument("--payments-file", type=str, help="Path to payments JSON file (batch mode)")
+    parser.add_argument("--output",        type=str, help="Output JSON file path (batch mode)")
     args = parser.parse_args()
 
     # ── Mock mode ────────────────────────────────────────────────────────────
@@ -864,7 +871,38 @@ if __name__ == "__main__":
         except Exception:
             traceback.print_exc()
 
-    if args.live:
+    # ── Batch mode — called by Next.js /api/voice via subprocess ─────────────
+    async def _run_batch() -> None:
+        if not args.audio_file:
+            print(json.dumps({"error": "--audio-file is required in batch mode"}))
+            sys.exit(1)
+
+        with open(args.audio_file, "rb") as fh:
+            audio_bytes = fh.read()
+
+        contacts = (
+            json.loads(open(args.contacts_file, encoding="utf-8").read())
+            if args.contacts_file else SAMPLE_CONTACTS
+        )
+        payments = (
+            json.loads(open(args.payments_file, encoding="utf-8").read())
+            if args.payments_file else []
+        )
+
+        intent = await understand_voice(
+            audio_bytes=audio_bytes,
+            contacts=contacts,
+            payments=payments,
+            speaker_name=args.speaker or "User",
+        )
+
+        out_path = args.output or "split_intent_output.json"
+        with open(out_path, "w", encoding="utf-8") as fh:
+            json.dump(intent.model_dump(), fh, indent=2)
+
+    if args.batch:
+        asyncio.run(_run_batch())
+    elif args.live:
         asyncio.run(_run_live_safe())
     else:
         asyncio.run(_run_mock())
