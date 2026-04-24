@@ -1,6 +1,7 @@
 // OWNER: Francesco
 import crypto from 'crypto'
 import { loadSession, saveSession, clearSession } from './session-store'
+import { MOCK_CONTACTS } from './mock-data'
 import type { BunqContact, PaymentRequest } from '@/types'
 
 const BASE_URL = 'https://public-api.sandbox.bunq.com/v1'
@@ -221,11 +222,10 @@ export async function acceptPaymentRequest(requestResponseId: number) {
 }
 
 export async function getBunqContacts(): Promise<BunqContact[]> {
-  return [
-    { name: 'Giorgio',   alias: 'giorgio@sandbox.com' },
-    { name: 'Vaggelis',  alias: 'vaggelis@sandbox.com' },
-    { name: 'Diego',     alias: 'diego@sandbox.com' },
-  ]
+  if (MOCK) return MOCK_CONTACTS
+  if (!_s.sessionToken) await initBunq()
+  // Bunq sandbox has no contact API — use hardcoded team members for demo
+  return MOCK_CONTACTS
 }
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
