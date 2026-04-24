@@ -47,7 +47,8 @@ function headers(token?: string, method = 'POST', path = '', body = '') {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}: ${v}`)
       .join('\n')
-    h['X-Bunq-Client-Signature'] = sign(`${method} ${path}\n${headerStr}\n\n${body}`)
+    // Bunq signing format: "{METHOD} /v1{PATH}\n\n{HEADERS}\n\n{BODY}"
+    h['X-Bunq-Client-Signature'] = sign(`${method} /v1${path}\n\n${headerStr}\n\n${body}`)
   }
   return h
 }
