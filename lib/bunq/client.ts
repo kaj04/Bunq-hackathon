@@ -72,6 +72,11 @@ async function bunqGet(path: string, token: string) {
   return res.json()
 }
 
+export async function bunqGetPublic(path: string) {
+  await initBunq()
+  return bunqGet(path, _s.sessionToken)
+}
+
 async function _init() {
   generateKeys()
   const API_KEY = process.env.BUNQ_API_KEY!
@@ -105,6 +110,16 @@ export async function initBunq() {
   return _initPromise
 }
 
+export async function getBunqSession() {
+  await initBunq()
+  return {
+    userId: _s.userId,
+    accountId: _s.accountId,
+    sessionToken: _s.sessionToken,
+    privateKey: _s.privateKey,
+  }
+}
+
 export async function createPaymentRequest(req: PaymentRequest) {
   await initBunq()
   return bunqPost(
@@ -119,8 +134,29 @@ export async function createPaymentRequest(req: PaymentRequest) {
   )
 }
 
-export async function getBunqContacts(): Promise<BunqContact[]> {
+export async function createPaymentRequestBatch(requests: PaymentRequest[]) {
   await initBunq()
+  const total = requests.reduce((sum, r) => sum + r.amount, 0)
+  return bunqPost(
+    `/user/${_s.userId}/monetary-account/${_s.accountId}/request-inquiry-batch`,
+    {
+      request_inquiries: requests.map(r => ({
+        amount_inquired: { value: r.amount.toFixed(2), currency: r.currency },
+        counterparty_alias: { type: 'EMAIL', value: r.recipientAlias },
+        description: r.description,
+        allow_bunqme: true,
+      })),
+      total_amount_inquired: {
+        value: total.toFixed(2),
+        currency: requests[0]?.currency ?? 'EUR',
+      },
+    },
+    _s.sessionToken,
+  )
+}
+
+export async function getBunqContacts(): Promise<BunqContact[]> {
+  if (process.env.BUNQ_MOCK !== 'true') await initBunq()
   // Sandbox has no real contact list — return test contacts for demo
   return [
     { name: 'Francesco', alias: 'francesco@example.com' },
