@@ -1,0 +1,43 @@
+{
+  "restaurant": "Berghotel Grosse Scheidegg",
+  "date": "2007-07-30",
+  "currency": "CHF",
+  "items": [
+    {
+      "name": "Latte Macchiato",
+      "quantity": 2,
+      "unit_price": 4.5,
+      "total_price": 9.0,
+      "category": "drinks",
+      "uncertain": false
+    },
+    {
+      "name": "Gloki",
+      "quantity": 1,
+      "unit_price": 5.0,
+      "total_price": 5.0,
+      "category": "drinks",
+      "uncertain": false
+    },
+    {
+      "name": "Schweinschnitzel",
+      "quantity": 1,
+      "unit_price": 22.0,
+      "total_price": 22.0,
+      "category": "food",
+      "uncertain": false
+    },
+    {
+      "name": "Chässpätzli",
+      "quantity": 1,
+      "unit_price": 18.5,
+      "total_price": 18.5,
+      "category": "food",
+      "uncertain": false
+    }
+  ],
+  "subtotal": 50.65,
+  "tax": 3.85,
+  "tip": 0.0,
+  "total": 54.5
+}
