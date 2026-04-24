@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+@theme {
+  --color-background: #0d0d0d;
+  --color-card: #1a1a1a;
+  --color-bunq: #00a86b;
+  --color-bunq-light: #00c880;
+  --color-border-subtle: #262626;
+
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-3xl: 32px;
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-white antialiased;
+  }
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { @apply bg-transparent; }
+::-webkit-scrollbar-thumb { @apply bg-zinc-800 rounded-full; }
+
+.glass { @apply bg-card/80 backdrop-blur-md border border-border-subtle; }
+
+.btn-primary {
+  @apply bg-bunq hover:bg-bunq-light text-black font-bold py-3 px-6 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-white/5 hover:bg-white/10 text-white font-semibold py-3 px-6 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border border-border-subtle;
+}
+
+.card-high-density {
+  @apply bg-card rounded-[24px] border border-border-subtle overflow-hidden;
+}
