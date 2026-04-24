@@ -30,14 +30,16 @@ export const MeditaSplit: React.FC = () => {
       ])
       const [balData, txData, reqData] = await Promise.all([balRes.json(), txRes.json(), reqRes.json()])
 
-      if (balData.success) setBalance(Number(balData.data).toFixed(2))
+      if (balData.success && Array.isArray(balData.data) && balData.data.length > 0) {
+        setBalance(parseFloat(balData.data[0].balance).toFixed(2))
+      }
 
       if (txData.success) {
         setTransactions(
           txData.data.map((tx: any) => ({
             id: tx.id,
             counterparty: tx.counterparty,
-            amount: Math.abs(tx.amount),
+            amount: Math.abs(parseFloat(tx.amount)),
             type: tx.type === 'in' ? 'income' : 'outcome',
             groupName: tx.groupName ?? null,
           }))
