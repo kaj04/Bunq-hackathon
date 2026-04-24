@@ -1,11 +1,19 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import type { Receipt, SplitResult } from '@/types'
 
-export default function BillSplitter() {
+export default function BillSplitter({ 
+  isEmbedded = false, 
+  initialParticipants = '', 
+  onGroupSplit 
+}: { 
+  isEmbedded?: boolean; 
+  initialParticipants?: string; 
+  onGroupSplit?: (splits: SplitResult[]) => void; 
+}) {
   const [tab, setTab] = useState<'voice' | 'image'>('voice')
-  const [participants, setParticipants] = useState('')
+  const [participants, setParticipants] = useState(initialParticipants)
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [receipt, setReceipt] = useState<Receipt | null>(null)
@@ -15,6 +23,10 @@ export default function BillSplitter() {
   const [scanLoading, setScanLoading] = useState(false)
   const [payStatus, setPayStatus] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (initialParticipants) setParticipants(initialParticipants)
+  }, [initialParticipants])
 
   const recognitionRef = useRef<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -121,16 +133,27 @@ export default function BillSplitter() {
     }
   }
 
-  return (
-    <main className="min-h-screen bg-gradient-to-br from-[#00a86b] to-[#004d31] p-4 flex items-start justify-center">
-      <div className="w-full max-w-md pt-10">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <h1 className="text-4xl font-bold text-white tracking-tight">Bill Splitter</h1>
-          <p className="text-green-200 mt-1">Voice & photo powered by Claude + Bunq</p>
-        </div>
+    const Wrapper = isEmbedded ? 'div' : 'main'
+    const wrapperClass = isEmbedded 
+      ? "w-full" 
+      : "min-h-screen bg-gradient-to-br from-[#00a86b] to-[#004d31] p-4 flex items-start justify-center"
+    
+    const innerClass = isEmbedded 
+      ? "w-full" 
+      : "w-full max-w-md pt-10"
 
-        <div className="bg-white rounded-3xl shadow-2xl p-6 space-y-5">
+  return (
+    <Wrapper className={wrapperClass}>
+      <div className={innerClass}>
+        {/* Header */}
+        {!isEmbedded && (
+          <div className="text-center mb-6">
+            <h1 className="text-4xl font-bold text-white tracking-tight">Bill Splitter</h1>
+            <p className="text-green-200 mt-1">Voice & photo powered by Claude + Bunq</p>
+          </div>
+        )}
+
+        <div className={isEmbedded ? "space-y-5" : "bg-white rounded-3xl shadow-2xl p-6 space-y-5"}>
 
           {/* Participants */}
           <div>
@@ -277,24 +300,35 @@ export default function BillSplitter() {
                       <p className="font-semibold text-gray-800">{s.participant.name}</p>
                       <p className="text-2xl font-bold text-green-600">€{s.amount.toFixed(2)}</p>
                     </div>
-                    <button
-                      onClick={() => sendPayment(s)}
-                      disabled={!!payStatus[s.participant.name]}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition ${
-                        payStatus[s.participant.name]
-                          ? payStatus[s.participant.name].includes('✓') ? 'bg-gray-400' : 'bg-red-400'
-                          : 'bg-[#00a86b] hover:bg-green-700'
-                      }`}
-                    >
-                      {payStatus[s.participant.name] ?? 'Request via Bunq'}
-                    </button>
+                    {!onGroupSplit && (
+                      <button
+                        onClick={() => sendPayment(s)}
+                        disabled={!!payStatus[s.participant.name]}
+                        className={`px-4 py-2 rounded-xl text-sm font-semibold text-white transition ${
+                          payStatus[s.participant.name]
+                            ? payStatus[s.participant.name].includes('✓') ? 'bg-gray-400' : 'bg-red-400'
+                            : 'bg-[#00a86b] hover:bg-green-700'
+                        }`}
+                      >
+                        {payStatus[s.participant.name] ?? 'Request via Bunq'}
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
+              
+              {onGroupSplit && (
+                <button
+                  onClick={() => onGroupSplit(splits)}
+                  className="mt-4 w-full bg-[#00a86b] text-white py-3 rounded-xl font-bold text-sm hover:bg-green-700 transition"
+                >
+                  Conferma e Invia al Gruppo
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
-    </main>
+    </Wrapper>
   )
 }

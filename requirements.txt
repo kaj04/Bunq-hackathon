@@ -1,0 +1,6 @@
+anthropic>=0.97.0
+groq>=1.0.0
+rapidfuzz>=3.13.0
+pydantic>=2.0.0
+sounddevice>=0.5.0   # for live mic recording (--live mode)
+python-dotenv>=1.0.0 # loads .env.local automatically

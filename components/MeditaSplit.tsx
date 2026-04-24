@@ -10,6 +10,7 @@ type Screen = 'home' | 'groups' | 'group' | 'requests'
 type Expense = {
   id: string; description: string; amount: number
   paidBy: string; category: string; date: string; imageUrl?: string
+  splits?: { name: string; amount: number }[]
 }
 
 type Group = {
@@ -380,6 +381,26 @@ function GroupScreen({ group, onBack, onAddExpense, addLog, refreshData }: {
     return acc
   }, {})
 
+  // Calculate balances: map name -> current +/- balance relative to the group
+  // Positive mean they are owed money, negative means they owe money.
+  const balances = group.expenses.reduce<Record<string, number>>((acc, e) => {
+    const payer = e.paidBy === 'Me' ? 'Francesco' : e.paidBy
+    acc[payer] = (acc[payer] || 0) + e.amount
+    
+    const splitArr = e.splits || [
+      { name: 'Francesco', amount: e.amount / (group.members.length + 1) },
+      ...group.members.map(m => ({ name: m.name, amount: e.amount / (group.members.length + 1) }))
+    ]
+    
+    splitArr.forEach(s => {
+      acc[s.name] = (acc[s.name] || 0) - s.amount
+    })
+    
+    return acc
+  }, {})
+
+  const yourBalance = balances['Francesco'] || 0
+
   return (
     <div className="pb-4">
       {/* Header with color */}
@@ -409,14 +430,37 @@ function GroupScreen({ group, onBack, onAddExpense, addLog, refreshData }: {
             <p className="text-gray-400 text-xs mb-1">Total spent</p>
             <p className="text-white text-2xl font-bold">€{total.toFixed(2)}</p>
           </div>
-          <div className="flex-1 bg-white/10 rounded-2xl p-4">
-            <p className="text-gray-400 text-xs mb-1">Your share</p>
-            <p className="text-white text-2xl font-bold">€{(total / (group.members.length + 1)).toFixed(2)}</p>
+          <div className="flex-1 bg-white/10 rounded-2xl p-4 border border-white/5 relative overflow-hidden">
+             <div className={`absolute top-0 right-0 w-12 h-12 rounded-full opacity-10 ${yourBalance >= 0 ? 'bg-green-400' : 'bg-red-400'}`} style={{ transform: 'translate(40%, -40%)' }} />
+            <p className="text-gray-400 text-xs mb-1">{yourBalance >= 0 ? 'Owed to you' : 'You owe'}</p>
+            <p className={`text-2xl font-bold ${yourBalance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              €{Math.abs(yourBalance).toFixed(2)}
+            </p>
           </div>
         </div>
       </div>
 
       <div className="px-5">
+        {/* Balances list */}
+        <div className="mb-5">
+          <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-3">Group balances</p>
+          <div className="bg-[#1a1a1a] rounded-3xl p-4 divide-y divide-white/5">
+            {['Francesco', ...group.members.map(m => m.name)].map(name => {
+              const bal = balances[name] || 0
+              if (Math.abs(bal) < 0.01) return null
+              return (
+                <div key={name} className="flex justify-between items-center py-3 first:pt-0 last:pb-0">
+                  <span className="text-gray-300 text-sm">{name === 'Francesco' ? 'Me' : name}</span>
+                  <span className={`text-sm font-bold ${bal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {bal >= 0 ? '+' : '-'}€{Math.abs(bal).toFixed(2)}
+                  </span>
+                </div>
+              )
+            }).filter(Boolean)}
+            {Object.keys(balances).length === 0 && <p className="text-gray-500 text-xs text-center py-2">Everyone is settled</p>}
+          </div>
+        </div>
+
         {/* Category grid */}
         {Object.keys(byCategory).length > 0 && (
           <div className="mb-5">
@@ -491,7 +535,7 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
   addLog: (msg: string) => void
   refreshData: () => void
 }) {
-  const [mode, setMode] = useState<'choose' | 'voice' | 'photo' | 'confirm'>('choose')
+  const [mode, setMode] = useState<'confirm'>('confirm')
   const [listening, setListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -586,6 +630,7 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
         category,
         date: new Date().toISOString().slice(0, 10),
         imageUrl: imagePreview ?? undefined,
+        splits: splits ? splits.map(s => ({ name: s.participant.name, amount: s.amount })) : undefined
       })
       await refreshData()
     } else {
@@ -602,139 +647,81 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
           <button onClick={onClose} className="text-gray-400 text-2xl">×</button>
         </div>
 
-        {mode === 'choose' && (
-          <div className="space-y-3">
-            <button onClick={() => { setMode('photo'); setTimeout(() => fileRef.current?.click(), 100) }}
-              className="w-full bg-[#0d0d0d] rounded-2xl p-5 flex items-center gap-4 border border-white/10">
-              <span className="text-4xl">📷</span>
-              <div className="text-left">
-                <p className="text-white font-semibold">Photo receipt</p>
-                <p className="text-gray-400 text-sm">Claude reads & splits automatically</p>
-              </div>
-            </button>
-            <button onClick={() => setMode('voice')}
-              className="w-full bg-[#0d0d0d] rounded-2xl p-5 flex items-center gap-4 border border-white/10">
-              <span className="text-4xl">🎤</span>
-              <div className="text-left">
-                <p className="text-white font-semibold">Voice input</p>
-                <p className="text-gray-400 text-sm">Tell the amount and how to split</p>
-              </div>
-            </button>
-            <button onClick={() => setMode('confirm')}
-              className="w-full bg-[#0d0d0d] rounded-2xl p-5 flex items-center gap-4 border border-white/10">
-              <span className="text-4xl">✏️</span>
-              <div className="text-left">
-                <p className="text-white font-semibold">Manual entry</p>
-                <p className="text-gray-400 text-sm">Type amount and description</p>
-              </div>
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-          </div>
-        )}
+        <div className="space-y-4">
+          <input value={desc} onChange={e => setDesc(e.target.value)}
+            placeholder="Title (e.g. Dinner in Roma)"
+            className="w-full bg-[#0d0d0d] text-white rounded-2xl px-5 py-4 text-sm outline-none border border-white/10 focus:border-[#7c3aed] transition" />
 
-        {mode === 'photo' && (
-          <div className="text-center space-y-4">
-            {loading ? (
-              <div className="py-12">
-                <div className="text-5xl mb-4 animate-pulse">🤖</div>
-                <p className="text-white font-semibold">Claude is reading receipt…</p>
-                <p className="text-gray-400 text-sm mt-1">Detecting items and prices</p>
-              </div>
-            ) : imagePreview ? (
-              <img src={imagePreview} className="max-h-48 mx-auto rounded-2xl" />
-            ) : (
-              <div onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-gray-600 rounded-2xl p-12 cursor-pointer">
-                <p className="text-4xl mb-2">📷</p>
-                <p className="text-gray-400 text-sm">Tap to upload receipt</p>
-              </div>
-            )}
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-          </div>
-        )}
-
-        {mode === 'voice' && (
-          <div className="text-center space-y-4">
-            <button onClick={listening ? stopVoice : startVoice}
-              className={`w-24 h-24 rounded-full mx-auto flex items-center justify-center text-4xl transition-all ${listening ? 'bg-red-500 animate-pulse scale-110' : 'bg-[#00a86b] hover:scale-105'}`}>
-              {listening ? '⏹' : '🎤'}
-            </button>
-            <p className="text-gray-400 text-sm">{listening ? 'Listening…' : 'Tap to speak'}</p>
-            {transcript && (
-              <div className="bg-[#0d0d0d] rounded-2xl p-4 text-left">
-                <p className="text-gray-500 text-xs mb-1">You said:</p>
-                <p className="text-white text-sm italic">"{transcript}"</p>
-              </div>
-            )}
-            {transcript && (
-              <button onClick={() => setMode('confirm')} className="w-full bg-[#00a86b] text-white py-3 rounded-xl font-semibold text-sm">
-                Continue →
-              </button>
-            )}
-          </div>
-        )}
-
-        {mode === 'confirm' && (
-          <div className="space-y-4">
-            {receipt && (
-              <div className="bg-[#0d0d0d] rounded-2xl p-4">
-                <p className="text-gray-400 text-xs mb-2">Receipt items</p>
-                {receipt.items.map((item, i) => (
-                  <div key={i} className="flex justify-between text-sm py-1">
-                    <span className="text-gray-300">{item.name} ×{item.quantity}</span>
-                    <span className="text-white font-medium">€{item.price.toFixed(2)}</span>
+          <div className="grid grid-cols-2 gap-3">
+             <div onClick={() => fileRef.current?.click()}
+                className={`relative h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition ${imagePreview ? 'border-[#7c3aed]' : 'border-gray-800 hover:border-gray-500'}`}>
+                {loading && !receipt ? (
+                  <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center z-10">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mb-1" />
+                    <p className="text-[8px] text-white uppercase font-bold">Scanning...</p>
                   </div>
-                ))}
-                <div className="border-t border-gray-700 mt-2 pt-2 flex justify-between font-bold">
-                  <span className="text-gray-300">Total</span>
-                  <span className="text-white">€{receipt.total.toFixed(2)}</span>
+                ) : null}
+                {imagePreview ? (
+                  <img src={imagePreview} className="w-full h-full object-cover rounded-xl" />
+                ) : (
+                  <>
+                    <p className="text-3xl mb-1">📷</p>
+                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Add Photo</p>
+                  </>
+                )}
+             </div>
+
+             <div className="grid grid-rows-2 gap-2">
+                <div className="bg-[#0d0d0d] rounded-2xl p-3 border border-white/10 flex flex-col justify-center">
+                  <p className="text-gray-500 text-[8px] font-bold uppercase mb-1">Total Amount</p>
+                  <input value={amount} onChange={e => setAmount(e.target.value)}
+                    placeholder="€0.00" type="number" step="0.01"
+                    className="bg-transparent text-white font-bold text-lg outline-none w-full" />
                 </div>
-              </div>
-            )}
+                <div className="bg-[#0d0d0d] rounded-2xl p-3 border border-white/10 flex items-center justify-between">
+                   <p className="text-gray-500 text-[8px] font-bold uppercase tracking-wider">Type</p>
+                   <select value={category} onChange={e => setCategory(e.target.value)}
+                     className="bg-transparent text-white text-xs outline-none border-none cursor-pointer font-bold">
+                     {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{CATEGORIES[c].emoji} {c}</option>)}
+                   </select>
+                </div>
+             </div>
+          </div>
 
-            <input value={desc} onChange={e => setDesc(e.target.value)}
-              placeholder="Description (e.g. Cena da Mario)"
-              className="w-full bg-[#0d0d0d] text-white rounded-xl px-4 py-3 text-sm outline-none border border-white/10" />
+          <div className="relative">
+             <textarea value={transcript} onChange={e => setTranscript(e.target.value)}
+                placeholder="AI instructions (Who paid? Extra splits?)"
+                className="w-full bg-[#0d0d0d] text-white rounded-2xl px-5 py-4 text-sm outline-none border border-white/10 focus:border-[#7c3aed] transition min-h-[90px] pr-12 pt-4" />
+             <button onClick={listening ? stopVoice : startVoice}
+                className={`absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center transition-all ${listening ? 'bg-red-500 animate-pulse' : 'bg-white/5 hover:bg-white/10'}`}>
+                {listening ? '⏹' : '🎤'}
+             </button>
+          </div>
 
-            {!receipt && (
-              <input value={amount} onChange={e => setAmount(e.target.value)}
-                placeholder="Amount (€)" type="number" step="0.01"
-                className="w-full bg-[#0d0d0d] text-white rounded-xl px-4 py-3 text-sm outline-none border border-white/10" />
-            )}
-
-            <div className="grid grid-cols-3 gap-2">
-              {Object.entries(CATEGORIES).map(([cat, info]) => (
-                <button key={cat} onClick={() => setCategory(cat)}
-                  className={`rounded-xl p-3 text-center transition ${category === cat ? 'border-2' : 'bg-[#0d0d0d]'}`}
-                  style={category === cat ? { borderColor: info.color, background: info.color + '20' } : {}}>
-                  <p className="text-xl">{info.emoji}</p>
-                  <p className="text-gray-400 text-xs mt-1">{cat}</p>
-                </button>
-              ))}
-            </div>
-
-            {!splits ? (
-              <button onClick={calculateSplit} disabled={loading}
-                className="w-full bg-[#7c3aed] text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-40">
-                {loading ? 'Calculating split…' : `Split equally among ${group.members.length + 1}`}
-              </button>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider">Split result</p>
+          {!splits ? (
+            <button onClick={calculateSplit} disabled={loading || !desc}
+              className="w-full bg-[#7c3aed] text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-purple-500/30 disabled:opacity-40 transition active:scale-[0.98]">
+              {loading ? 'Processing...' : 'Magic AI Split ✨'}
+            </button>
+          ) : (
+            <div className="space-y-3 pt-1 animate-in fade-in slide-in-from-bottom-2">
+              <div className="bg-[#0d0d0d] rounded-2xl p-4 space-y-2 border border-white/5">
                 {splits.map((s, i) => (
-                  <div key={i} className="flex justify-between items-center bg-[#0d0d0d] rounded-xl px-4 py-3">
-                    <span className="text-white text-sm">{s.participant.name}</span>
-                    <span className="text-[#00a86b] font-bold">€{s.amount.toFixed(2)}</span>
+                  <div key={i} className="flex justify-between items-center py-1">
+                    <span className="text-gray-300 text-sm">{s.participant.name}</span>
+                    <span className="text-green-400 font-bold">€{s.amount.toFixed(2)}</span>
                   </div>
                 ))}
-                <button onClick={sendRequests} disabled={sending}
-                  className="w-full bg-[#00a86b] text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-40">
-                  {sending ? 'Sending requests…' : '✓ Send payment requests'}
-                </button>
               </div>
-            )}
-          </div>
-        )}
+              <button onClick={sendRequests} disabled={sending}
+                className="w-full bg-[#00a86b] text-white py-4 font-bold rounded-2xl shadow-xl shadow-green-500/20 active:scale-[0.98] transition">
+                {sending ? 'Sending Requests...' : 'Confirm and Split'}
+              </button>
+              <button onClick={() => setSplits(null)} className="w-full text-gray-500 text-[9px] font-bold uppercase tracking-widest py-1">Reset Calculation</button>
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
+        </div>
       </div>
     </div>
   )
