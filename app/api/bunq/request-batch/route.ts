@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createPaymentRequestBatch } from '@/lib/bunq/client'
+import { createGroupSplit } from '@/lib/bunq/client'
 import type { ApiResponse, PaymentRequest } from '@/types'
 
 export async function POST(
@@ -17,7 +17,7 @@ export async function POST(
     if (!requests?.length) {
       return NextResponse.json({ success: false, error: 'No requests provided' }, { status: 400 })
     }
-    const result = await createPaymentRequestBatch(requests)
+    const result = await createGroupSplit(requests)
     return NextResponse.json({ success: true, data: result })
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 })

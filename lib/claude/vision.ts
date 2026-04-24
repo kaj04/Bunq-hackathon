@@ -5,9 +5,8 @@ import Anthropic from "@anthropic-ai/sdk"
 import { RECEIPT_VISION_PROMPT } from "./prompts"
 import type { Receipt } from "@/types"
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 export async function scanReceipt(imageBase64: string, mediaType: string): Promise<Receipt> {
+  const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY })
   const response = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,

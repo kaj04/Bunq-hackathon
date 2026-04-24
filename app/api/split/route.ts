@@ -4,10 +4,9 @@ import Anthropic from '@anthropic-ai/sdk'
 import { SPLIT_PROMPT_WITH_RECEIPT, SPLIT_PROMPT_VOICE_ONLY } from '@/lib/claude/prompts'
 import type { ApiResponse, SplitResult } from '@/types'
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-
 export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<SplitResult[]>>> {
   try {
+    const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY })
     const { receipt, participants, voiceInput } = await req.json()
 
     const prompt = receipt

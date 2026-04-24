@@ -52,7 +52,7 @@ export async function runAgent(
   transcript: string,
   prevHistory?: any[],
 ): Promise<AgentResponse> {
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+  const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY ?? process.env.ANTHROPIC_API_KEY })
 
   const messages: Anthropic.MessageParam[] = prevHistory
     ? [...prevHistory, { role: 'user', content: transcript }]
