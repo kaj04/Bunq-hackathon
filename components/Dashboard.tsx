@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import BillSplitter from './BillSplitter'
 
 type Transaction = {
   id: number; amount: string; currency: string
@@ -129,21 +130,41 @@ export default function Dashboard() {
               <input value={splitDesc} onChange={e => setSplitDesc(e.target.value)}
                 placeholder="Descrizione (es. Cena Roma)"
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" />
-              <input value={splitTotal} onChange={e => setSplitTotal(e.target.value)}
-                placeholder="Totale da dividere (€)" type="number" step="0.01"
-                className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" />
               <input value={splitMembers} onChange={e => setSplitMembers(e.target.value)}
                 placeholder="Membri (virgola separati)"
                 className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:border-green-500 focus:outline-none" />
-              {splitTotal && splitMembers && (
-                <p className="text-xs text-gray-500">
-                  €{(parseFloat(splitTotal || '0') / splitMembers.split(',').filter(Boolean).length).toFixed(2)} a testa
-                </p>
-              )}
-              <button onClick={doGroupSplit} disabled={splitting}
-                className="w-full bg-green-500 text-white py-2.5 rounded-xl font-semibold text-sm disabled:opacity-40 hover:bg-green-600 transition">
-                {splitting ? 'Invio richieste…' : 'Invia richieste di pagamento'}
-              </button>
+              
+              <div className="bg-gray-50 rounded-xl p-4 mt-2">
+                <BillSplitter 
+                  isEmbedded 
+                  initialParticipants={splitMembers} 
+                  onGroupSplit={async (cvSplits) => {
+                    if (!splitDesc || !splitMembers) {
+                      setSplitMsg('Inserisci la Descrizione e i Membri prima di confermare.')
+                      return
+                    }
+                    setSplitting(true)
+                    setSplitMsg('')
+                    const totalAmount = cvSplits.reduce((acc, curr) => acc + curr.amount, 0)
+                    const members = cvSplits.map(s => ({
+                      name: s.participant.name,
+                      alias: s.participant.bunqAlias ?? `${s.participant.name.toLowerCase()}@sandbox.com`,
+                      amount: s.amount
+                    }))
+
+                    const res = await fetch('/api/bunq/split-group', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ description: splitDesc, totalAmount, members }),
+                    })
+                    const data = await res.json()
+                    setSplitMsg(data.success ? `✓ Richieste di pagamento (Tot: €${totalAmount.toFixed(2)}) inviate a ${members.length} persone!` : `✗ ${data.error}`)
+                    setSplitting(false)
+                    if (data.success) { setTimeout(() => { setSplitDesc(''); setShowSplit(false); load(); }, 2000) }
+                  }}
+                />
+              </div>
+              {splitting && <p className="text-sm text-center text-gray-500 animate-pulse">Invio in corso al gruppo...</p>}
               {splitMsg && <p className="text-sm text-center font-medium text-green-700">{splitMsg}</p>}
             </div>
           </div>

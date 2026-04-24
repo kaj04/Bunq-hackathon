@@ -22,8 +22,10 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
   const [manualTotal, setManualTotal] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
+  const [clarification, setClarification] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
-  const recognitionRef = useRef<any>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef   = useRef<Blob[]>([])
 
   const processReceiptImage = async (file: File) => {
     setMode('camera')
@@ -45,19 +47,23 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
         if (data.success) {
           clearInterval(interval)
           setReceiptData(data.data)
-          await getSplits(data.data.total)
+          await getSplits(data.data.total, '', data.data)
+        } else {
+          clearInterval(interval)
+          setStep('select')
+          alert('Could not read receipt. Please try again or use manual entry.')
         }
       } catch { clearInterval(interval); setStep('select') }
     }
     reader.readAsDataURL(file)
   }
 
-  const getSplits = async (total: number, voiceInput = '') => {
+  const getSplits = async (total: number, voiceInput = '', receiptOverride?: ReceiptData | null) => {
     const res = await fetch('/api/split', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        receipt: receiptData,
+        receipt: receiptOverride ?? receiptData,
         participants: group.members,
         voiceInput,
       }),
@@ -69,22 +75,85 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
     setStep('review')
   }
 
-  const startVoice = () => {
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) { alert('Voice requires Chrome'); return }
-    const r = new SR()
-    r.lang = 'en-US'; r.continuous = false; r.interimResults = false
-    r.onresult = async (e: any) => {
-      const t = e.results[0][0].transcript
-      setTranscript(t)
-      setIsRecording(false)
-      setMode('voice'); setStep('process')
-      setProcessingText('Processing voice input...')
-      await getSplits(0, t)
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        processVoiceAudio(new Blob(audioChunksRef.current, { type: mimeType }), mimeType)
+      }
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setIsRecording(true)
+    } catch {
+      alert('Could not access microphone. Please allow mic permissions.')
     }
-    r.onend = () => setIsRecording(false)
-    recognitionRef.current = r
-    r.start(); setIsRecording(true)
+  }
+
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop()
+    setIsRecording(false)
+    setMode('voice')
+    setStep('process')
+    setProcessingText('Transcribing audio...')
+  }
+
+  const processVoiceAudio = async (blob: Blob, mimeType: string) => {
+    const base64 = await new Promise<string>(resolve => {
+      const reader = new FileReader()
+      reader.onload = ev => resolve((ev.target?.result as string).split(',')[1])
+      reader.readAsDataURL(blob)
+    })
+
+    try {
+      setProcessingText('Understanding your request...')
+      const res = await fetch('/api/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64: base64, mediaType: mimeType, speaker: 'Me' }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+
+      const intent = data.data
+      setTranscript(intent.transcript ?? '')
+      setClarification(intent.clarification_needed ?? null)
+
+      // Build receipt-like display from matched payments or stated amount
+      if (intent.matched_payments?.length) {
+        setReceiptData({
+          items: intent.matched_payments.map((p: any) => ({ name: p.description, price: p.amount, quantity: 1 })),
+          total: intent.amount ?? intent.matched_payments.reduce((s: number, p: any) => s + p.amount, 0),
+          currency: intent.currency ?? 'EUR',
+        })
+      } else if (intent.amount) {
+        setReceiptData({
+          items: [{ name: intent.description || 'Voice expense', price: intent.amount, quantity: 1 }],
+          total: intent.amount,
+          currency: intent.currency ?? 'EUR',
+        })
+      }
+
+      // Map voice_nlu splits → SplitResult[]
+      if (intent.splits?.length) {
+        setSplits(intent.splits.map((s: any) => ({ name: s.name, amount: s.owes.toFixed(2) })))
+      } else {
+        // Fallback: equal split among group members if NLU returned no participants
+        const total = intent.amount ?? 0
+        const perPerson = total / group.members.length
+        setSplits(group.members.map(m => ({ name: m, amount: perPerson.toFixed(2) })))
+      }
+
+      setStep('review')
+    } catch (err) {
+      console.error('Voice processing failed:', err)
+      setStep('select')
+      alert('Voice processing failed. Please try again.')
+    }
   }
 
   const handleManualSubmit = async () => {
@@ -99,7 +168,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
   }
 
   const handleFinalConfirm = () => {
-    const desc = mode === 'manual' ? manualDescription : mode === 'voice' ? (transcript || 'Voice expense') : 'Receipt expense'
+    const desc = mode === 'manual' ? manualDescription : mode === 'voice' ? (transcript || receiptData?.items[0]?.name || 'Voice expense') : 'Receipt expense'
     const total = receiptData?.total ?? parseFloat(manualTotal) ?? 0
     onConfirm(desc, total, splits)
   }
@@ -128,7 +197,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
                 ].map((m) => (
                   <button
                     key={m.id}
-                    onClick={() => m.id === 'camera' ? fileRef.current?.click() : m.id === 'voice' ? startVoice() : setMode('manual')}
+                    onClick={() => m.id === 'camera' ? fileRef.current?.click() : m.id === 'voice' ? startRecording() : setMode('manual')}
                     className="flex flex-col items-center gap-6 p-8 bg-white/5 hover:bg-white/10 border border-white/5 border-dashed hover:border-white/20 rounded-[32px] transition-all group active:scale-95"
                   >
                     <div className={`w-20 h-20 ${m.color} rounded-3xl flex items-center justify-center text-white shadow-xl group-hover:scale-110 transition-transform`}>
@@ -160,9 +229,12 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
                   <div className="w-16 h-16 bg-rose-500 rounded-full flex items-center justify-center mx-auto animate-pulse mb-3">
                     <Mic size={32} className="text-white" />
                   </div>
-                  <p className="text-white font-semibold">Listening... speak now</p>
-                  <button onClick={() => { recognitionRef.current?.stop(); setIsRecording(false) }}
-                    className="mt-3 text-xs text-zinc-500 hover:text-white">Stop</button>
+                  <p className="text-white font-semibold">Recording... speak now</p>
+                  <p className="text-xs text-zinc-500 mt-1">e.g. "Split yesterday's dinner with Giorgio and Diego"</p>
+                  <button onClick={stopRecording}
+                    className="mt-4 px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold rounded-full transition-colors">
+                    Done talking
+                  </button>
                 </div>
               )}
             </div>
@@ -227,10 +299,24 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
               </div>
 
               <div className="pt-4 flex flex-col gap-4">
-                <div className="flex items-center gap-3 p-4 bg-bunq/5 rounded-2xl border border-bunq/20">
-                  <CheckCircle2 className="text-bunq" size={20} />
-                  <p className="text-xs text-white/70 italic">Calculated automatically by MeditaSplit AI.</p>
-                </div>
+                {transcript && (
+                  <div className="flex items-start gap-3 p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <Mic size={16} className="text-white/40 mt-0.5 shrink-0" />
+                    <p className="text-xs text-white/60 italic">"{transcript}"</p>
+                  </div>
+                )}
+                {clarification && (
+                  <div className="flex items-start gap-3 p-4 bg-yellow-500/10 rounded-2xl border border-yellow-500/20">
+                    <CheckCircle2 size={16} className="text-yellow-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-yellow-200">{clarification}</p>
+                  </div>
+                )}
+                {!clarification && (
+                  <div className="flex items-center gap-3 p-4 bg-bunq/5 rounded-2xl border border-bunq/20">
+                    <CheckCircle2 className="text-bunq" size={20} />
+                    <p className="text-xs text-white/70 italic">Calculated automatically by MeditaSplit AI.</p>
+                  </div>
+                )}
                 <button onClick={handleFinalConfirm} className="btn-primary w-full !py-4 shadow-xl shadow-bunq/20">
                   <Send size={20} /> Send payment requests via Bunq
                 </button>

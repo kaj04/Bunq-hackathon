@@ -7,14 +7,14 @@
       "id": 1,
       "amount": 42.5,
       "description": "Beers at Bar Noord",
-      "date": "2026-04-23",
+      "date": "2026-04-24",
       "counterparty": "Bar Noord"
     },
     {
       "id": 2,
       "amount": 24.0,
       "description": "Taxi home after bar",
-      "date": "2026-04-23",
+      "date": "2026-04-24",
       "counterparty": "Uber"
     }
   ],
@@ -24,35 +24,22 @@
       "email": "francesco@example.com",
       "phone": "+31611111111",
       "confidence": 1.0
-    },
-    {
-      "name": "Diego",
-      "email": "sophie@example.com",
-      "phone": "+31644444444",
-      "confidence": 1.0
     }
   ],
   "splits": [
     {
       "name": "Francesco",
       "email": "francesco@example.com",
-      "owes": 22.17,
-      "quantity": null,
-      "item": null
-    },
-    {
-      "name": "Diego",
-      "email": "sophie@example.com",
-      "owes": 22.17,
+      "owes": 33.25,
       "quantity": null,
       "item": null
     }
   ],
-  "description": "Beers at Bar Noord and Taxi home after bar",
+  "description": "beers",
   "time_reference": "yesterday",
-  "confidence": 0.85,
+  "confidence": 0.92,
   "include_speaker": true,
   "clarification_needed": null,
-  "transcript": "Yesterday I paid the expenses for me, Francesco and Diego, split between the three of us.",
-  "intent_hash": "0ff24fb3ab55603a"
+  "transcript": "Split yesterday's beers with Francesco",
+  "intent_hash": "be38b778ca440449"
 }
