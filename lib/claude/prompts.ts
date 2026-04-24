@@ -1,34 +1,51 @@
 // OWNER: Diego
-// Tutti i prompt Claude centralizzati qui — facile iterare senza toccare la logica
 
 export const RECEIPT_VISION_PROMPT = `
-Analizza questa immagine di uno scontrino.
-Restituisci SOLO un JSON valido con questa struttura, senza testo aggiuntivo:
+Analyze this receipt image. Return ONLY valid JSON, no extra text:
 {
   "items": [{ "name": "string", "price": number, "quantity": number }],
   "total": number,
   "currency": "EUR"
 }
-Se un campo non è leggibile, usa il valore più probabile.
+If a value is unclear, use the most likely estimate.
 `
 
-export const SPLIT_PROMPT = (
+export const SPLIT_PROMPT_WITH_RECEIPT = (
   receipt: string,
   participants: string[],
   voiceInput: string
 ) => `
-Hai questo scontrino in formato JSON:
+Receipt JSON:
 ${receipt}
 
-Partecipanti: ${participants.join(", ")}
+Participants: ${participants.join(', ')}
 
-L'utente ha detto: "${voiceInput}"
+User instruction: "${voiceInput || 'split equally'}"
 
-Dividi il conto secondo le istruzioni vocali. Se non ci sono istruzioni specifiche, dividi equamente.
-Restituisci SOLO un JSON valido:
+Follow the user instruction to split the bill. If no specific instruction, split equally.
+Return ONLY valid JSON:
 {
   "splits": [
-    { "participant": "nome", "amount": number, "items": ["item1", "item2"] }
+    { "participant": "name", "amount": number, "items": ["item name"] }
   ]
 }
+Amounts must sum to the receipt total. Round to 2 decimal places.
+`
+
+export const SPLIT_PROMPT_VOICE_ONLY = (
+  participants: string[],
+  voiceInput: string
+) => `
+The user wants to split a bill. Participants: ${participants.join(', ')}.
+
+User said: "${voiceInput}"
+
+Extract the total amount and split instructions from what the user said.
+Return ONLY valid JSON:
+{
+  "splits": [
+    { "participant": "name", "amount": number, "items": [] }
+  ]
+}
+If amounts are unclear, split any mentioned total equally among all participants.
 `

@@ -1,9 +1,7 @@
 // OWNER: Francesco
-// POST /api/bunq/request — invia richiesta di pagamento tramite Bunq
-
-import { NextRequest, NextResponse } from "next/server"
-import { createPaymentRequest } from "@/lib/bunq/client"
-import type { ApiResponse, PaymentRequest } from "@/types"
+import { NextRequest, NextResponse } from 'next/server'
+import { createPaymentRequest } from '@/lib/bunq/client'
+import type { ApiResponse, PaymentRequest } from '@/types'
 
 export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<null>>> {
   try {
