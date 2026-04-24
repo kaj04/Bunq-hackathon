@@ -1,5 +1,5 @@
-import BillSplitter from '@/components/BillSplitter'
+import MeditaSplit from '@/components/MeditaSplit'
 
 export default function Home() {
-  return <BillSplitter />
+  return <MeditaSplit />
 }
