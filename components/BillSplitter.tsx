@@ -154,7 +154,7 @@ export default function BillSplitter() {
                 onClick={() => { setTab(t); setSplits(null); setError(null) }}
                 className={`flex-1 py-2 rounded-xl text-sm font-semibold capitalize transition-all ${tab === t ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}
               >
-                {t === 'voice' ? '🎤 Voice' : '📷 Photo'}
+                {t === 'voice' ? '📝 Input' : '📷 Photo'}
               </button>
             ))}
           </div>
@@ -162,22 +162,22 @@ export default function BillSplitter() {
           {/* ── VOICE TAB ── */}
           {tab === 'voice' && (
             <div className="text-center space-y-4">
-              <button
-                onClick={listening ? stopListening : startListening}
-                className={`w-24 h-24 rounded-full text-4xl shadow-lg transition-all mx-auto block ${
-                  listening ? 'bg-red-500 animate-pulse scale-110' : 'bg-green-500 hover:bg-green-600 hover:scale-105'
-                }`}
-              >
-                {listening ? '⏹' : '🎤'}
-              </button>
-              <p className="text-xs text-gray-400">{listening ? 'Listening… speak now' : 'Tap to start speaking'}</p>
-
-              {transcript && (
-                <div className="bg-gray-50 rounded-xl p-4 text-left">
-                  <p className="text-xs text-gray-400 mb-1">You said:</p>
-                  <p className="text-gray-800 text-sm italic">"{transcript}"</p>
-                </div>
-              )}
+              <textarea
+                value={transcript}
+                onChange={e => setTranscript(e.target.value)}
+                placeholder="e.g. 'I paid 50 euros for drinks for Giorgio and me'"
+                className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm focus:border-green-500 focus:outline-none transition min-h-[100px]"
+              />
+              
+              <div className="flex gap-2 items-center justify-center">
+                <p className="text-xs text-gray-400">Or use your microphone:</p>
+                <button
+                  onClick={listening ? stopListening : startListening}
+                  className={`px-4 py-2 rounded-xl text-white text-sm font-semibold transition ${listening ? 'bg-red-500 animate-pulse' : 'bg-gray-400 hover:bg-gray-500'}`}
+                >
+                  {listening ? '⏹ Stop' : '🎤 Dictate'}
+                </button>
+              </div>
 
               <button
                 onClick={() => doSplit(null)}
@@ -232,14 +232,20 @@ export default function BillSplitter() {
               {/* Optional voice instruction for image mode */}
               <div>
                 <p className="text-xs text-gray-400 mb-2">Optional: describe how to split</p>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-start">
                   <button
                     onClick={listening ? stopListening : startListening}
+                    title="Use microphone"
                     className={`px-4 py-2 rounded-xl text-white text-sm font-semibold transition ${listening ? 'bg-red-500 animate-pulse' : 'bg-gray-400 hover:bg-gray-500'}`}
                   >
                     {listening ? '⏹' : '🎤'}
                   </button>
-                  {transcript && <p className="text-xs text-gray-500 italic flex-1 truncate">"{transcript}"</p>}
+                  <textarea
+                    value={transcript}
+                    onChange={e => setTranscript(e.target.value)}
+                    placeholder="e.g. 'Split equally'"
+                    className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-green-500 focus:outline-none transition min-h-[40px]"
+                  />
                 </div>
               </div>
 

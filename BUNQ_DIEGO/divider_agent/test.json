@@ -1,0 +1,15 @@
+{
+  "user": "Me",
+  "people": [
+    "Me",
+    "Diego"
+  ],
+  "currency": "EUR",
+  "settlements": [
+    {
+      "from": "Me",
+      "to": "Diego",
+      "amount": 25.0
+    }
+  ]
+}
