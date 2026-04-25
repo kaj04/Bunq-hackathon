@@ -142,17 +142,14 @@ export const MeditaSplit: React.FC = () => {
     setIsAddExpenseOpen(false)
     try {
       const members = splits
-        .filter(s => s.name !== currentUser)
+        .filter(s => s.name !== currentUser && s.name.toLowerCase() !== 'sugar daddy')
         .map(s => {
           const fromState = memberAliases.find(m => m.name === s.name)
           const fromGroup = activeGroup?.members.find(m => m.name === s.name)
-          const alias = fromState?.alias || fromGroup?.alias || `${s.name.toLowerCase()}@sandbox.com`
-          return {
-            name: s.name,
-            alias,
-            amount: parseFloat(s.amount as string),
-          }
+          const alias = fromState?.alias || fromGroup?.alias || null
+          return alias ? { name: s.name, alias, amount: parseFloat(s.amount as string) } : null
         })
+        .filter((s): s is { name: string; alias: string; amount: number } => s !== null)
       const res = await fetch('/api/bunq/split-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -62,6 +62,7 @@ Participants in this group: ${participants.join(', ')}
 User said: "${voiceInput}"
 
 Instructions:
+- Only include participants from the group list above. Never invent names or include "Sugar Daddy", transaction counterparties, or anyone not in the list.
 - If the user refers to a past split ("same as last time", "like the dinner on Tuesday", "split it like before"), look in the chat history for matching splits and reuse those amounts/participants.
 - If the user refers to "yesterday", "this morning", etc., find matching transactions by date and description.
 - If the user mentions a specific amount, use that amount.
