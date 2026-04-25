@@ -107,15 +107,26 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
 
         const splitText = splits.map((s: any) => `• ${s.participant.name}: €${s.amount.toFixed(2)}`).join('\n')
 
+        const resolvedSplits = splits
+          .map((s: any) => {
+            const name: string = s.participant?.name ?? s.name ?? ''
+            if (!name || name.toLowerCase() === 'sugar daddy') return null
+            const member = group.members.find(m => m.name === name)
+            const alias = member?.alias ?? null
+            if (!alias || !alias.includes('@')) return null
+            return { name, alias, amount: s.amount }
+          })
+          .filter(Boolean) as { name: string; alias: string; amount: number }[]
+
+        if (!resolvedSplits.length) {
+          setMessages(prev => prev.slice(0, -1))
+          addMessage('agent', 'I couldn\'t match the participants to group members with valid emails. Make sure everyone in the split is added to this group with their real Bunq email.')
+          setIsProcessing(false)
+          return
+        }
+
         setPendingSplit({
-          splits: splits.map((s: any) => {
-            const member = group.members.find(m => m.name === s.participant.name)
-            return {
-              name: s.participant.name,
-              alias: member?.alias ?? `${s.participant.name.toLowerCase()}@sandbox.com`,
-              amount: s.amount,
-            }
-          }),
+          splits: resolvedSplits,
           description,
           total,
         })
@@ -137,7 +148,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
     if (!pendingSplit) return
     setIsSending(true)
     try {
-      const members = pendingSplit.splits.filter(s => s.name !== 'Francesco')
+      const members = pendingSplit.splits
       const res = await fetch('/api/bunq/split-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
