@@ -70,9 +70,11 @@ export const MeditaSplit: React.FC = () => {
         setTransactions(
           txData.data.map((tx: any) => ({
             id: tx.id,
-            counterparty: tx.counterparty,
+            description: tx.description ?? '',
+            counterparty: tx.counterparty ?? '',
             amount: Math.abs(parseFloat(tx.amount)),
             type: tx.type === 'in' ? 'income' : 'outcome',
+            date: tx.date ?? '',
             groupName: tx.groupName ?? null,
           }))
         )

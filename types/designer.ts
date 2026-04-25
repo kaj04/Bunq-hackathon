@@ -7,6 +7,7 @@ export interface ChatMessage {
 }
 
 export interface Transaction {
+  id?: number
   amount: number
   description: string
   type: 'income' | 'outcome'

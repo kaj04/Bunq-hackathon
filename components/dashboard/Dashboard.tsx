@@ -116,8 +116,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
                 <tbody>
                   {transactions.length > 0 ? transactions.map((tx, idx) => (
                     <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
-                      <td className="py-4 px-4 font-bold text-zinc-200 group-hover:text-white transition-colors">{tx.counterparty}</td>
-                      <td className="py-4 px-4 text-zinc-500 text-xs italic opacity-60 font-medium">{tx.groupName || 'Direct Payment'}</td>
+                      <td className="py-4 px-4">
+                        <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">{tx.description || tx.counterparty}</p>
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">{tx.counterparty}</p>
+                      </td>
+                      <td className="py-4 px-4 text-zinc-500 text-xs italic opacity-60 font-medium">{tx.groupName || 'Direct'}</td>
                       <td className={`py-4 px-4 text-right font-bold tabular-nums ${tx.type === 'income' ? 'text-bunq' : 'text-rose-500'}`}>
                         {tx.type === 'income' ? '+' : '-'} € {Math.abs(tx.amount).toFixed(2)}
                       </td>
