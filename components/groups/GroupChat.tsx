@@ -16,15 +16,23 @@ type PendingSplit = {
   total: number
 }
 
+const STORAGE_KEY = (groupId: string) => `meditasplit_chat_${groupId}`
+
+const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
+  id: 'welcome',
+  sender: 'agent',
+  text: `Hey! I'm here to help you split expenses in ${groupName}.\n\nYou can say things like:\n• "Split last night's dinner between Giorgio and Diego"\n• "We spent €80 at the restaurant, split between everyone"\n• Or attach a photo of the receipt 📷`,
+  timestamp: new Date().toISOString(),
+})
+
 export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddExpense, onExpenseAdded }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: '1',
-      sender: 'agent',
-      text: `Hey! I'm here to help you split expenses in ${group.name}.\n\nYou can say things like:\n• "Split last night's dinner between Giorgio and Diego"\n• "We spent €80 at the restaurant, split between everyone"\n• Or attach a photo of the receipt 📷`,
-      timestamp: new Date().toISOString(),
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY(group.id))
+      if (saved) return JSON.parse(saved)
+    } catch { /* ignore */ }
+    return [WELCOME_MESSAGE(group.name)]
+  })
   const [inputText, setInputText] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -37,6 +45,21 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
+
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY(group.id), JSON.stringify(messages)) } catch { /* ignore */ }
+  }, [messages, group.id])
+
+  // Builds a compact text summary of past AI messages for LLM context
+  const buildChatContext = (): string | undefined => {
+    const agentMessages = messages
+      .filter(m => m.sender === 'agent' && m.id !== 'welcome' && !m.text.startsWith('⏳'))
+      .slice(-10) // last 10 AI messages
+    if (!agentMessages.length) return undefined
+    return agentMessages
+      .map(m => `[${m.timestamp.slice(0, 10)}] ${m.text.slice(0, 300)}`)
+      .join('\n---\n')
+  }
 
   const addMessage = (sender: 'user' | 'agent', text: string) => {
     setMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date().toISOString() }])
@@ -68,6 +91,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
           participants: group.members.map(m => m.name),
           voiceInput: text,
           recentTransactions,
+          chatHistory: buildChatContext(),
         }),
       })
       const data = await res.json()

@@ -7,7 +7,7 @@ import { SPLIT_PROMPT_WITH_RECEIPT, SPLIT_PROMPT_VOICE_ONLY } from '@/lib/claude
 export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<SplitResult[]>>> {
   try {
     const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY })
-    const { receipt, participants: rawParticipants, voiceInput, recentTransactions, speaker } = await req.json()
+    const { receipt, participants: rawParticipants, voiceInput, recentTransactions, chatHistory, speaker } = await req.json()
     // participants can arrive as string[] or GroupMember[] — normalise to names
     const participants: string[] = Array.isArray(rawParticipants)
       ? rawParticipants.map((p: any) => (typeof p === 'string' ? p : p.name)).filter(Boolean)
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
 
     const prompt = receipt
       ? SPLIT_PROMPT_WITH_RECEIPT(JSON.stringify(receipt), participants, voiceInput ?? '', speaker)
-      : SPLIT_PROMPT_VOICE_ONLY(participants, voiceInput ?? '', txContext)
+      : SPLIT_PROMPT_VOICE_ONLY(participants, voiceInput ?? '', txContext, chatHistory)
 
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',

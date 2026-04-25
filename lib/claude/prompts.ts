@@ -49,28 +49,31 @@ Return ONLY valid JSON, no explanation:
 export const SPLIT_PROMPT_VOICE_ONLY = (
   participants: string[],
   voiceInput: string,
-  recentTransactions?: string
+  recentTransactions?: string,
+  chatHistory?: string
 ) => `
-You are a bill-splitting assistant. The user may speak Italian or English.
+You are a bill-splitting assistant for a group expense app.
 Today's date: ${new Date().toISOString().split('T')[0]}
 
-${recentTransactions ? `Recent transactions (last 20):\n${recentTransactions}\n` : ''}
+${chatHistory ? `--- GROUP CHAT HISTORY (past splits in this group) ---\n${chatHistory}\n---\n` : ''}
+${recentTransactions ? `--- RECENT BUNQ TRANSACTIONS ---\n${recentTransactions}\n---\n` : ''}
 Participants in this group: ${participants.join(', ')}
 
 User said: "${voiceInput}"
 
 Instructions:
-- If the user refers to "ieri" (yesterday), "le spese di ieri" (yesterday's expenses), "stamattina" (this morning), etc., find matching transactions in the recent transactions list by date and description.
+- If the user refers to a past split ("same as last time", "like the dinner on Tuesday", "split it like before"), look in the chat history for matching splits and reuse those amounts/participants.
+- If the user refers to "yesterday", "this morning", etc., find matching transactions by date and description.
 - If the user mentions a specific amount, use that amount.
 - Split among the participants mentioned, or all group members if none specified.
-- The amounts must sum to the total. Round to 2 decimal places.
+- The amounts must sum to the total exactly. Round to 2 decimal places.
 
 Return ONLY valid JSON:
 {
   "total": number,
   "description": "brief description of what was split",
   "splits": [
-    { "participant": "name", "amount": number }
+    { "name": "participant name", "amount": number }
   ]
 }
 `
