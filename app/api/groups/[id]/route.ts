@@ -15,11 +15,12 @@ function write(data: any[]) {
   fs.writeFileSync(STORE, JSON.stringify(data, null, 2))
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const patch = await req.json()
     const groups = read()
-    const idx = groups.findIndex((g: any) => g.id === params.id)
+    const idx = groups.findIndex((g: any) => g.id === id)
     if (idx < 0) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 })
     groups[idx] = { ...groups[idx], ...patch }
     write(groups)
@@ -29,9 +30,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const groups = read().filter((g: any) => g.id !== params.id)
+    const { id } = await params
+    const groups = read().filter((g: any) => g.id !== id)
     write(groups)
     return NextResponse.json({ success: true })
   } catch (err) {
