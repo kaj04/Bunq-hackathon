@@ -28,6 +28,8 @@ const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
 
 export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableContacts, onUpdateGroup, onExpenseAdded }) => {
   const [showSettings, setShowSettings] = useState(false)
+  const [addName, setAddName] = useState('')
+  const [addEmail, setAddEmail] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY(group.id))
@@ -292,10 +294,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
                 </div>
               </div>
 
-              {/* Add members */}
+              {/* Add members — from contacts */}
               {availableContacts.filter(c => !group.members.some(m => m.name === c.name)).length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Add Members</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Contacts</p>
                   <div className="space-y-2">
                     {availableContacts
                       .filter(c => !group.members.some(m => m.name === c.name))
@@ -305,7 +307,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
                             <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-500">
                               {c.name.charAt(0)}
                             </div>
-                            <p className="text-sm font-semibold text-zinc-400">{c.name}</p>
+                            <div>
+                              <p className="text-sm font-semibold text-zinc-400">{c.name}</p>
+                              <p className="text-[10px] text-zinc-600 truncate max-w-[160px]">{c.alias}</p>
+                            </div>
                           </div>
                           <button
                             onClick={() => {
@@ -322,6 +327,47 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
                   </div>
                 </div>
               )}
+
+              {/* Add by email — manual */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Add by email</p>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="text" placeholder="Display name (optional)" value={addName}
+                    onChange={e => setAddName(e.target.value)}
+                    className="bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-bunq"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="email" placeholder="bunq sandbox email" value={addEmail}
+                      onChange={e => setAddEmail(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key !== 'Enter') return
+                        const email = addEmail.trim()
+                        if (!email.includes('@')) return
+                        if (group.members.some(m => m.alias === email)) return
+                        const name = addName.trim() || email.split('@')[0]
+                        onUpdateGroup({ ...group, members: [...group.members, { name, alias: email }], memberCount: group.members.length + 1 })
+                        setAddName(''); setAddEmail('')
+                      }}
+                      className="flex-1 bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-bunq"
+                    />
+                    <button
+                      onClick={() => {
+                        const email = addEmail.trim()
+                        if (!email.includes('@')) return
+                        if (group.members.some(m => m.alias === email)) return
+                        const name = addName.trim() || email.split('@')[0]
+                        onUpdateGroup({ ...group, members: [...group.members, { name, alias: email }], memberCount: group.members.length + 1 })
+                        setAddName(''); setAddEmail('')
+                      }}
+                      className="p-2 bg-bunq/20 border border-bunq/40 rounded-xl hover:bg-bunq/30 transition-colors"
+                    >
+                      <UserPlus size={14} className="text-bunq" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
