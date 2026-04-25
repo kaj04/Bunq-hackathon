@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { Home, Users, Search } from 'lucide-react'
+import { Home, Users } from 'lucide-react'
 
 interface SidebarProps {
   activeTab: string
@@ -55,15 +55,7 @@ interface TopBarProps {
 }
 
 export const TopBar: React.FC<TopBarProps> = ({ userName = 'Me' }) => (
-  <div className="h-16 border-b border-border-subtle flex items-center justify-between px-8 bg-background/50 backdrop-blur-xl sticky top-0 z-10 ml-64">
-    <div className="relative w-80">
-      <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
-      <input
-        type="text"
-        placeholder="Quick search..."
-        className="w-full bg-white/5 border border-border-subtle rounded-xl py-2 pl-11 pr-4 text-xs focus:outline-none focus:border-bunq/30 transition-all"
-      />
-    </div>
+  <div className="h-16 border-b border-border-subtle flex items-center justify-end px-8 bg-background/50 backdrop-blur-xl sticky top-0 z-10 ml-64">
     <div className="flex items-center gap-2">
       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10 flex items-center justify-center text-xs font-bold text-white">
         {userName.charAt(0)}
