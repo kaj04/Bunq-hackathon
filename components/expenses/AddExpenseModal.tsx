@@ -1,18 +1,19 @@
 'use client'
 import React, { useState, useRef } from 'react'
-import { X, Camera, Mic, Edit3, Send, CheckCircle2, Smartphone } from 'lucide-react'
+import { X, Camera, Mic, Edit3, Send, CheckCircle2, Smartphone, Users } from 'lucide-react'
 import { Group, ReceiptData, SplitResult } from '@/types/designer'
 
 interface AddExpenseModalProps {
   group: Group
+  currentUser?: string
   onClose: () => void
   onConfirm: (description: string, total: number, splits: SplitResult[]) => void
 }
 
-type Step = 'select' | 'process' | 'review'
+type Step = 'select' | 'process' | 'voice-after-scan' | 'review'
 type Mode = 'camera' | 'voice' | 'manual'
 
-export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose, onConfirm }) => {
+export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, currentUser, onClose, onConfirm }) => {
   const [step, setStep] = useState<Step>('select')
   const [mode, setMode] = useState<Mode | null>(null)
   const [processingText, setProcessingText] = useState('AI is looking for details...')
@@ -21,16 +22,25 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
   const [manualDescription, setManualDescription] = useState('')
   const [manualTotal, setManualTotal] = useState('')
   const [isRecording, setIsRecording] = useState(false)
+  const [isDescribeRecording, setIsDescribeRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [clarification, setClarification] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
-  const audioChunksRef   = useRef<Blob[]>([])
+  const audioChunksRef = useRef<Blob[]>([])
+  const describeRecorderRef = useRef<MediaRecorder | null>(null)
+  const describeChunksRef = useRef<Blob[]>([])
+
+  const blobToBase64 = (blob: Blob): Promise<string> => new Promise(resolve => {
+    const reader = new FileReader()
+    reader.onload = ev => resolve((ev.target?.result as string).split(',')[1])
+    reader.readAsDataURL(blob)
+  })
 
   const processReceiptImage = async (file: File) => {
     setMode('camera')
     setStep('process')
-    const texts = ['Scanning receipt structure...', 'Extracting line items...', 'Identifying prices...', 'Finalizing split...']
+    const texts = ['Scanning receipt structure...', 'Extracting line items...', 'Identifying prices...', 'Finalizing...']
     let i = 0
     const interval = setInterval(() => { setProcessingText(texts[i]); i++; if (i >= texts.length) clearInterval(interval) }, 700)
 
@@ -44,12 +54,11 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
           body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
         })
         const data = await res.json()
+        clearInterval(interval)
         if (data.success) {
-          clearInterval(interval)
           setReceiptData(data.data)
-          await getSplits(data.data.total, '', data.data)
+          setStep('voice-after-scan')
         } else {
-          clearInterval(interval)
           setStep('select')
           alert('Could not read receipt. Please try again or use manual entry.')
         }
@@ -59,6 +68,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
   }
 
   const getSplits = async (total: number, voiceInput = '', receiptOverride?: ReceiptData | null) => {
+    setStep('process')
+    setProcessingText('Calculating split...')
     const res = await fetch('/api/split', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -66,6 +77,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
         receipt: receiptOverride ?? receiptData,
         participants: group.members,
         voiceInput,
+        speaker: currentUser,
       }),
     })
     const data = await res.json()
@@ -74,6 +86,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
     }
     setStep('review')
   }
+
+  // ── Initial voice mode (no receipt) ──────────────────────────────────────────
 
   const startRecording = async () => {
     try {
@@ -103,12 +117,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
   }
 
   const processVoiceAudio = async (blob: Blob, mimeType: string) => {
-    const base64 = await new Promise<string>(resolve => {
-      const reader = new FileReader()
-      reader.onload = ev => resolve((ev.target?.result as string).split(',')[1])
-      reader.readAsDataURL(blob)
-    })
-
+    const base64 = await blobToBase64(blob)
     try {
       setProcessingText('Understanding your request...')
       const res = await fetch('/api/voice', {
@@ -123,7 +132,6 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
       setTranscript(intent.transcript ?? '')
       setClarification(intent.clarification_needed ?? null)
 
-      // Build receipt-like display from matched payments or stated amount
       if (intent.matched_payments?.length) {
         setReceiptData({
           items: intent.matched_payments.map((p: any) => ({ name: p.description, price: p.amount, quantity: 1 })),
@@ -138,11 +146,9 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
         })
       }
 
-      // Map voice_nlu splits → SplitResult[]
       if (intent.splits?.length) {
         setSplits(intent.splits.map((s: any) => ({ name: s.name, amount: s.owes.toFixed(2) })))
       } else {
-        // Fallback: equal split among group members if NLU returned no participants
         const total = intent.amount ?? 0
         const perPerson = total / group.members.length
         setSplits(group.members.map(m => ({ name: m.name, amount: perPerson.toFixed(2) })))
@@ -155,6 +161,55 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
       alert('Voice processing failed. Please try again.')
     }
   }
+
+  // ── Describe recording (after receipt scan) ───────────────────────────────────
+
+  const startDescribeRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const recorder = new MediaRecorder(stream, { mimeType })
+      describeChunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) describeChunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        processDescribeAudio(new Blob(describeChunksRef.current, { type: mimeType }), mimeType)
+      }
+      describeRecorderRef.current = recorder
+      recorder.start()
+      setIsDescribeRecording(true)
+    } catch {
+      alert('Could not access microphone. Please allow mic permissions.')
+    }
+  }
+
+  const stopDescribeRecording = () => {
+    describeRecorderRef.current?.stop()
+    setIsDescribeRecording(false)
+    setProcessingText('Understanding who ordered what...')
+  }
+
+  const processDescribeAudio = async (blob: Blob, mimeType: string) => {
+    setStep('process')
+    setProcessingText('Calculating personalised split...')
+    const base64 = await blobToBase64(blob)
+    try {
+      const res = await fetch('/api/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audioBase64: base64, mediaType: mimeType, speaker: 'Me' }),
+      })
+      const data = await res.json()
+      const voiceTranscript = data.success ? (data.data?.transcript ?? '') : ''
+      setTranscript(voiceTranscript)
+      await getSplits(receiptData!.total, voiceTranscript, receiptData)
+    } catch (err) {
+      console.error('Describe recording failed:', err)
+      await getSplits(receiptData!.total, '', receiptData)
+    }
+  }
+
+  // ── Manual mode ───────────────────────────────────────────────────────────────
 
   const handleManualSubmit = async () => {
     if (!manualDescription || !manualTotal) return
@@ -187,13 +242,15 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
         </div>
 
         <div className="flex-1 overflow-y-auto p-8">
+
+          {/* ── Step: select mode ── */}
           {step === 'select' && (
             <div className="space-y-6">
               <div className="grid grid-cols-3 gap-6">
                 {[
                   { id: 'camera', icon: Camera, label: 'Camera', desc: 'Scan Receipt', color: 'bg-bunq' },
-                  { id: 'voice', icon: Mic, label: 'Voice', desc: 'Just describe it', color: 'bg-indigo-500' },
-                  { id: 'manual', icon: Edit3, label: 'Manual', desc: 'Enter details', color: 'bg-purple-500' },
+                  { id: 'voice',  icon: Mic,    label: 'Voice',  desc: 'Just describe it', color: 'bg-indigo-500' },
+                  { id: 'manual', icon: Edit3,   label: 'Manual', desc: 'Enter details', color: 'bg-purple-500' },
                 ].map((m) => (
                   <button
                     key={m.id}
@@ -240,6 +297,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
             </div>
           )}
 
+          {/* ── Step: AI processing ── */}
           {step === 'process' && (
             <div className="bg-[#1a1a1a] rounded-[24px] p-12 border-2 border-dashed border-bunq/40 flex flex-col items-center justify-center text-center space-y-6">
               <div className="w-16 h-16 bg-bunq/20 rounded-full flex items-center justify-center relative">
@@ -256,6 +314,74 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
             </div>
           )}
 
+          {/* ── Step: voice describe (after receipt scan) ── */}
+          {step === 'voice-after-scan' && receiptData && (
+            <div className="space-y-6">
+              {/* Scanned receipt summary */}
+              <div className="bg-white/5 rounded-[24px] p-6 border border-white/10">
+                <div className="flex justify-between items-center mb-4">
+                  <p className="text-xs font-bold text-white/40 uppercase tracking-[0.2em]">Receipt scanned</p>
+                  <p className="text-bunq font-bold text-lg">€ {receiptData.total.toFixed(2)}</p>
+                </div>
+                <div className="space-y-2">
+                  {receiptData.items.map((item, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-white/60">
+                        {item.name}{item.quantity && item.quantity > 1 ? ` ×${item.quantity}` : ''}
+                      </span>
+                      <span className="font-mono text-white/80">€ {item.price.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Prompt */}
+              <div className="text-center space-y-1">
+                <h4 className="font-bold text-xl">Who ordered what?</h4>
+                <p className="text-white/40 text-sm">
+                  e.g. "Giorgio had the pizza, I had the pasta and the beer"
+                </p>
+              </div>
+
+              {!isDescribeRecording ? (
+                <div className="flex gap-3">
+                  <button
+                    onClick={startDescribeRecording}
+                    className="flex-1 flex flex-col items-center gap-3 p-6 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 rounded-[24px] transition-all group active:scale-95"
+                  >
+                    <div className="w-14 h-14 bg-indigo-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Mic size={28} className="text-white" />
+                    </div>
+                    <span className="font-bold text-sm">Describe orders</span>
+                  </button>
+                  <button
+                    onClick={() => getSplits(receiptData.total, '', receiptData)}
+                    className="flex-1 flex flex-col items-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-[24px] transition-all group active:scale-95"
+                  >
+                    <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Users size={28} className="text-white/60" />
+                    </div>
+                    <span className="font-bold text-sm text-white/60">Split equally</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-6 space-y-4">
+                  <div className="w-16 h-16 bg-rose-500 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                    <Mic size={32} className="text-white" />
+                  </div>
+                  <p className="text-white font-semibold">Listening... describe who ordered what</p>
+                  <button
+                    onClick={stopDescribeRecording}
+                    className="px-8 py-3 bg-rose-500 hover:bg-rose-600 text-white text-sm font-semibold rounded-full transition-colors"
+                  >
+                    Done talking
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Step: review split ── */}
           {step === 'review' && (
             <div className="space-y-8">
               {receiptData && (
@@ -288,7 +414,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
                     <div key={idx} className="bg-card p-4 rounded-2xl border border-white/5 flex justify-between items-center">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center font-bold text-xs">
-                          {split.name.charAt(0)}
+                          {split.name?.charAt(0) ?? '?'}
                         </div>
                         <span className="font-semibold text-sm">{split.name}</span>
                       </div>
@@ -326,6 +452,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
               </div>
             </div>
           )}
+
         </div>
       </div>
     </div>

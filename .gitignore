@@ -2,6 +2,7 @@
 .env
 node_modules/
 .next/
+.next-*/
 .bunq-session*.json
 .bunq-device*.json
 .bunq-sugar*.json

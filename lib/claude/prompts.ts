@@ -13,23 +13,37 @@ If a value is unclear, use the most likely estimate.
 export const SPLIT_PROMPT_WITH_RECEIPT = (
   receipt: string,
   participants: string[],
-  voiceInput: string
+  voiceInput: string,
+  speaker?: string
 ) => `
+You are a bill-splitting assistant. Split the receipt based on who ordered what.
+
 Receipt JSON:
 ${receipt}
 
-Participants: ${participants.join(', ')}
+People at the table: ${participants.join(', ')}
+${speaker ? `\nThe person describing the orders is: ${speaker}. When they say "I", "me", or "my", they mean "${speaker}".` : ''}
 
-User instruction: "${voiceInput || 'split equally'}"
+${voiceInput
+  ? `Voice description: "${voiceInput}"
 
-Follow the user instruction to split the bill. If no specific instruction, split equally.
-Return ONLY valid JSON:
+Rules for assigning items:
+1. Map each mentioned person to items they ordered.
+2. "I"/"me"/"my" always refers to ${speaker ?? 'the speaker'}.
+3. QUANTITY MATH: When a receipt item has quantity > 1 (e.g. "Americano ×5: €10.00"), the unit price is total ÷ quantity = €2.00 each. If someone says they had 2, assign 2 × €2.00 = €4.00 to them, and distribute the remaining units to whoever else ordered them (or split equally among unnamed people if not specified).
+4. Phrases like "X got the rest" mean X ordered all remaining units of that item not claimed by others.
+5. If an item is shared, divide its cost equally among those sharing it.
+6. Only include people who actually ordered something — omit people with €0.`
+  : 'No description — split the total equally among all participants.'}
+
+The sum of all amounts MUST equal the receipt total exactly. Adjust the largest share by any rounding difference if needed.
+
+Return ONLY valid JSON, no explanation:
 {
   "splits": [
-    { "participant": "name", "amount": number, "items": ["item name"] }
+    { "participant": "name", "amount": number, "items": ["item: €price"] }
   ]
 }
-Amounts must sum to the receipt total. Round to 2 decimal places.
 `
 
 export const SPLIT_PROMPT_VOICE_ONLY = (

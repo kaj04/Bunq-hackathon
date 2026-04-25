@@ -74,12 +74,13 @@ const env = {
   BUNQ_API_KEY: account.apiKey,
   BUNQ_USER_ID: String(account.userId),
   BUNQ_ACCOUNT_ID: String(account.accountId),
-  BUNQ_USER_NAME: matched,   // tells session-store which cache files to use
+  BUNQ_USER_NAME: matched,                         // tells session-store which cache files to use
+  NEXT_DIST_DIR: `.next-${matched.toLowerCase()}`, // isolated build dir → no cross-instance conflict
 }
 
 console.log(`\nStarting MeditaSplit as "${matched}" on http://localhost:${port}\n`)
 
-const child = spawn('npm', ['run', 'dev', '--', '-p', port], {
+const child = spawn('npx', ['next', 'dev', '-p', port], {
   cwd: ROOT,
   env,
   stdio: 'inherit',

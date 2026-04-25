@@ -16,10 +16,10 @@ const INITIAL_MEMBERS = [
 ]
 
 const ALL_MEMBERS = [
-  { name: 'Francesco', alias: 'test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com' },
-  { name: 'Giorgio',   alias: 'giorgio@sandbox.com' },
-  { name: 'Vaggelis',  alias: 'vaggelis@sandbox.com' },
-  { name: 'Diego',     alias: 'diego@sandbox.com' },
+  { name: 'Francesco', alias: 'test+04f633e0-a0b9-462f-bb2f-d71d81d7d8ad@bunq.com' },
+  { name: 'Giorgio',   alias: 'test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com' },
+  { name: 'Vaggelis',  alias: 'test+a1223711-bee6-4974-bc54-b3ed8b11f121@bunq.com' },
+  { name: 'Diego',     alias: 'test+0e48be1e-7446-4b25-b0ac-6c16fbb0f38d@bunq.com' },
 ]
 
 const INITIAL_GROUPS: Group[] = [
@@ -141,12 +141,14 @@ export const MeditaSplit: React.FC = () => {
     setIsAddExpenseOpen(false)
     try {
       const members = splits
-        .filter(s => s.name !== 'Francesco') // Francesco è il pagante, non richiede a se stesso
+        .filter(s => s.name !== currentUser)
         .map(s => {
-          const member = memberAliases.find(m => m.name === s.name)
+          const fromState = memberAliases.find(m => m.name === s.name)
+          const fromGroup = activeGroup?.members.find(m => m.name === s.name)
+          const alias = fromState?.alias || fromGroup?.alias || `${s.name.toLowerCase()}@sandbox.com`
           return {
             name: s.name,
-            alias: member?.alias ?? `${s.name.toLowerCase()}@sandbox.com`,
+            alias,
             amount: parseFloat(s.amount as string),
           }
         })
@@ -221,6 +223,7 @@ export const MeditaSplit: React.FC = () => {
       {isAddExpenseOpen && (
         <AddExpenseModal
           group={activeGroup}
+          currentUser={currentUser}
           onClose={() => setIsAddExpenseOpen(false)}
           onConfirm={handleConfirmExpense}
         />

@@ -7,14 +7,18 @@ import { SPLIT_PROMPT_WITH_RECEIPT, SPLIT_PROMPT_VOICE_ONLY } from '@/lib/claude
 export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<SplitResult[]>>> {
   try {
     const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY })
-    const { receipt, participants, voiceInput, recentTransactions } = await req.json()
+    const { receipt, participants: rawParticipants, voiceInput, recentTransactions, speaker } = await req.json()
+    // participants can arrive as string[] or GroupMember[] — normalise to names
+    const participants: string[] = Array.isArray(rawParticipants)
+      ? rawParticipants.map((p: any) => (typeof p === 'string' ? p : p.name)).filter(Boolean)
+      : []
 
     const txContext = recentTransactions?.length
       ? recentTransactions.map((t: any) => `[${t.date?.slice(0, 10) ?? ''}] ${t.description} €${Math.abs(parseFloat(t.amount)).toFixed(2)} (${t.type === 'out' ? 'paid' : 'received'} — ${t.counterparty})`).join('\n')
       : undefined
 
     const prompt = receipt
-      ? SPLIT_PROMPT_WITH_RECEIPT(JSON.stringify(receipt), participants, voiceInput ?? '')
+      ? SPLIT_PROMPT_WITH_RECEIPT(JSON.stringify(receipt), participants, voiceInput ?? '', speaker)
       : SPLIT_PROMPT_VOICE_ONLY(participants, voiceInput ?? '', txContext)
 
     const response = await client.messages.create({
@@ -29,11 +33,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
     const splits = parsed.splits ?? []
     const description = parsed.description ?? voiceInput ?? 'Expense'
 
-    const result: SplitResult[] = splits.map((s: any) => ({
-      participant: { name: s.name },
-      amount: parseFloat(s.amount),
-      items: s.items ?? [],
-    }))
+    const result: SplitResult[] = splits
+      .map((s: any) => {
+        const name = typeof s.participant === 'string' ? s.participant : (s.participant?.name ?? s.name ?? '')
+        return {
+          participant: { name },
+          amount: parseFloat(s.amount) || 0,
+          items: s.items ?? [],
+        }
+      })
+      .filter((s) => s.participant.name)
 
     return NextResponse.json({ success: true, data: result, description })
   } catch (err) {
