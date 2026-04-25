@@ -1,6 +1,24 @@
 'use client'
-import React, { useState } from 'react'
-import { X, CreditCard, Send, Loader2 } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, CreditCard, Send, Loader2, MapPin } from 'lucide-react'
+
+const CATEGORIES = [
+  { emoji: '🍕', label: 'Food & Drink' },
+  { emoji: '🚗', label: 'Transport' },
+  { emoji: '🛒', label: 'Shopping' },
+  { emoji: '🎟', label: 'Entertainment' },
+  { emoji: '🏠', label: 'Home' },
+  { emoji: '💊', label: 'Health' },
+  { emoji: '✈️', label: 'Travel' },
+  { emoji: '📦', label: 'Other' },
+]
+
+interface Location {
+  city: string
+  country: string
+  latitude: number
+  longitude: number
+}
 
 interface QuickPayModalProps {
   onClose: () => void
@@ -10,18 +28,60 @@ interface QuickPayModalProps {
 export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess }) => {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState('')
+  const [category, setCategory] = useState(CATEGORIES[0])
+  const [location, setLocation] = useState<Location | null>(null)
+  const [locLoading, setLocLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Try to get location on mount
+  useEffect(() => {
+    if (!navigator.geolocation) return
+    setLocLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords
+        try {
+          // Reverse geocode with a public API (no key needed)
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
+            { headers: { 'Accept-Language': 'en' } }
+          )
+          const data = await res.json()
+          const city = data.address?.city ?? data.address?.town ?? data.address?.village ?? 'Unknown city'
+          const country = data.address?.country_code?.toUpperCase() ?? 'NL'
+          setLocation({ city, country, latitude, longitude })
+        } catch {
+          setLocation({ city: 'Amsterdam', country: 'NL', latitude, longitude })
+        }
+        setLocLoading(false)
+      },
+      () => {
+        // Fallback for demo if user denies location
+        setLocation({ city: 'Amsterdam', country: 'NL', latitude: 52.37, longitude: 4.89 })
+        setLocLoading(false)
+      },
+      { timeout: 5000 }
+    )
+  }, [])
 
   const handlePay = async () => {
     if (!description.trim() || !amount || parseFloat(amount) <= 0) return
     setLoading(true)
     setError(null)
     try {
+      const now = new Date()
       const res = await fetch('/api/bunq/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: parseFloat(amount), description: description.trim() }),
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          description: description.trim(),
+          category: category.label,
+          categoryEmoji: category.emoji,
+          location: location ?? undefined,
+          timestamp: now.toISOString(),
+        }),
       })
       const data = await res.json()
       if (!data.success) throw new Error(data.error ?? 'Payment failed')
@@ -56,7 +116,8 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
 
         {/* Form */}
         <div className="p-8 space-y-5">
-          {/* Amount — big and prominent like Apple Pay */}
+
+          {/* Amount */}
           <div className="text-center py-4">
             <p className="text-white/30 text-xs font-bold uppercase tracking-widest mb-3">Amount</p>
             <div className="flex items-center justify-center gap-2">
@@ -83,9 +144,43 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
             className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-bunq placeholder:text-white/30"
           />
 
-          {error && (
-            <p className="text-rose-400 text-xs text-center">{error}</p>
-          )}
+          {/* Category */}
+          <div>
+            <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-2">Category</p>
+            <div className="grid grid-cols-4 gap-2">
+              {CATEGORIES.map(c => (
+                <button
+                  key={c.label}
+                  onClick={() => setCategory(c)}
+                  className={`flex flex-col items-center gap-1 p-2 rounded-2xl text-xs transition-all ${
+                    category.label === c.label
+                      ? 'bg-bunq/20 border border-bunq/50 text-white'
+                      : 'bg-white/5 border border-transparent text-white/40 hover:text-white hover:bg-white/10'
+                  }`}
+                >
+                  <span className="text-xl">{c.emoji}</span>
+                  <span className="text-[9px] font-bold leading-tight text-center">{c.label.split(' ')[0]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Location */}
+          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
+            <MapPin size={16} className="text-bunq flex-shrink-0" />
+            {locLoading ? (
+              <span className="text-white/30 text-xs">Detecting location...</span>
+            ) : location ? (
+              <span className="text-white/60 text-xs font-medium">{location.city}, {location.country}</span>
+            ) : (
+              <span className="text-white/20 text-xs">Location unavailable</span>
+            )}
+            <span className="text-white/20 text-[10px] ml-auto uppercase tracking-widest">
+              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
+
+          {error && <p className="text-rose-400 text-xs text-center">{error}</p>}
 
           {/* Pay button */}
           <button
@@ -100,7 +195,7 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
           </button>
 
           <p className="text-center text-[10px] text-white/20 uppercase tracking-widest">
-            Charged to your Bunq Sandbox account
+            {category.emoji} {category.label} · Charged to your Bunq Sandbox account
           </p>
         </div>
       </div>

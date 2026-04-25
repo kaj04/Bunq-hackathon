@@ -167,7 +167,11 @@ export async function initBunq() {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /** Pagamento diretto (simulazione spesa personale) — appare nelle transazioni */
-export async function makePayment(amount: number, description: string) {
+export async function makePayment(
+  amount: number,
+  description: string,
+  geolocation?: { latitude: string; longitude: string; altitude: string; radius: string }
+) {
   if (MOCK) {
     MOCK_TRANSACTIONS.unshift({
       id: Date.now(),
@@ -186,6 +190,7 @@ export async function makePayment(amount: number, description: string) {
     amount: { value: amount.toFixed(2), currency: 'EUR' },
     counterparty_alias: { type: 'EMAIL', value: 'sugardaddy@bunq.com' },
     description,
+    ...(geolocation ? { geolocation } : {}),
   })
 }
 
