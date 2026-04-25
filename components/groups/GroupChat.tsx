@@ -1,11 +1,13 @@
 'use client'
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, Mic, Camera, Send, CheckCircle2 } from 'lucide-react'
-import { Group, GroupExpense, ChatMessage } from '@/types/designer'
+import { ArrowLeft, Mic, Camera, Send, CheckCircle2, Settings, X, UserPlus, Check } from 'lucide-react'
+import { Group, GroupExpense, ChatMessage, GroupMember } from '@/types/designer'
 
 interface GroupChatProps {
   group: Group
   onBack: () => void
+  availableContacts: GroupMember[]
+  onUpdateGroup: (updated: Group) => void
   onExpenseAdded?: (expense: GroupExpense) => void
 }
 
@@ -24,7 +26,8 @@ const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
   timestamp: new Date().toISOString(),
 })
 
-export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAdded }) => {
+export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableContacts, onUpdateGroup, onExpenseAdded }) => {
+  const [showSettings, setShowSettings] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY(group.id))
@@ -237,7 +240,92 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
             </div>
           </div>
         </div>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="p-2 hover:bg-white/5 rounded-xl transition-all text-zinc-400 hover:text-white"
+        >
+          <Settings size={20} />
+        </button>
       </div>
+
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowSettings(false)} />
+          <div className="relative w-80 h-full bg-zinc-900 border-l border-zinc-800 flex flex-col shadow-2xl animate-in slide-in-from-right duration-300">
+            <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
+              <h3 className="font-bold text-lg">Group Settings</h3>
+              <button onClick={() => setShowSettings(false)} className="p-1.5 hover:bg-white/5 rounded-lg transition-all text-zinc-400 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Current members */}
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Members ({group.members.length})</p>
+                <div className="space-y-2">
+                  {group.members.map((m) => (
+                    <div key={m.name} className="flex items-center justify-between bg-zinc-800/50 rounded-2xl px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
+                          {m.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{m.name}</p>
+                          <p className="text-[10px] text-zinc-500 truncate max-w-[140px]">{m.alias}</p>
+                        </div>
+                      </div>
+                      {group.members.length > 1 && (
+                        <button
+                          onClick={() => {
+                            const updated = { ...group, members: group.members.filter(x => x.name !== m.name), memberCount: group.members.length - 1 }
+                            onUpdateGroup(updated)
+                          }}
+                          className="p-1.5 hover:bg-rose-500/20 rounded-lg transition-all text-zinc-600 hover:text-rose-400"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add members */}
+              {availableContacts.filter(c => !group.members.some(m => m.name === c.name)).length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Add Members</p>
+                  <div className="space-y-2">
+                    {availableContacts
+                      .filter(c => !group.members.some(m => m.name === c.name))
+                      .map((c) => (
+                        <div key={c.name} className="flex items-center justify-between bg-zinc-800/30 border border-dashed border-zinc-700 rounded-2xl px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-500">
+                              {c.name.charAt(0)}
+                            </div>
+                            <p className="text-sm font-semibold text-zinc-400">{c.name}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const updated = { ...group, members: [...group.members, c], memberCount: group.members.length + 1 }
+                              onUpdateGroup(updated)
+                            }}
+                            className="p-1.5 hover:bg-bunq/20 rounded-lg transition-all text-zinc-600 hover:text-bunq"
+                          >
+                            <UserPlus size={14} />
+                          </button>
+                        </div>
+                      ))
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">

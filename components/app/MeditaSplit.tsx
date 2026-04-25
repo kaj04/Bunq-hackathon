@@ -142,6 +142,11 @@ export const MeditaSplit: React.FC = () => {
     setGroups(prev => [...prev, newGroup])
   }
 
+  const handleUpdateGroup = (updated: Group) => {
+    setGroups(prev => prev.map(g => g.id === updated.id ? updated : g))
+    setSelectedGroup(updated)
+  }
+
   const handleGroupExpenseAdded = (groupId: string, expense: GroupExpense) => {
     setGroups(prev => prev.map(g => {
       if (g.id !== groupId) return g
@@ -227,6 +232,11 @@ export const MeditaSplit: React.FC = () => {
             <GroupChat
               group={selectedGroup}
               onBack={() => setSelectedGroup(null)}
+              availableContacts={ALL_MEMBERS.map(m => {
+                const live = memberAliases.find(a => a.name === m.name)
+                return { name: m.name, alias: live?.alias || m.alias }
+              })}
+              onUpdateGroup={handleUpdateGroup}
               onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
             />
           )}
