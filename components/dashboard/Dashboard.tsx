@@ -147,15 +147,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
               <tbody>
                 {transactions.length > 0 ? transactions.map((tx, idx) => {
                   const isTopUp = tx.type === 'income' && tx.isSugarDaddy
+                  const isIncome = tx.type === 'income'
 
-                  // Parse enriched description: "[Category] Title — City, Country — HH:MM"
+                  // Parse time from Bunq date ("2026-04-25 14:30:00.000000" or ISO)
+                  const txTime = tx.date
+                    ? new Date(tx.date.replace(' ', 'T')).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+                    : null
+
+                  // Parse enriched description for outgoing: "[Category] Title — City, Country — HH:MM"
                   let title = tx.description || tx.counterparty
                   let location: string | null = null
-                  let time: string | null = null
+                  let descTime: string | null = null
                   let categoryEmoji: string | null = null
 
-                  if (!isTopUp && tx.description) {
-                    // Extract category bracket
+                  if (!isIncome && tx.description) {
                     const catMatch = tx.description.match(/^\[([^\]]+)\]\s*/)
                     if (catMatch) {
                       title = tx.description.slice(catMatch[0].length)
@@ -166,13 +171,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
                       }
                       categoryEmoji = catMap[catMatch[1]] ?? '📦'
                     }
-                    // Extract time: last "— HH:MM"
                     const timeMatch = title.match(/\s*—\s*(\d{2}:\d{2})\s*$/)
                     if (timeMatch) {
-                      time = timeMatch[1]
+                      descTime = timeMatch[1]
                       title = title.slice(0, title.length - timeMatch[0].length)
                     }
-                    // Extract location: remaining "— City, Country"
                     const locMatch = title.match(/\s*—\s*(.+)$/)
                     if (locMatch) {
                       location = locMatch[1]
@@ -180,29 +183,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
                     }
                   }
 
+                  const displayTime = descTime ?? txTime
+
                   return (
                   <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
                     <td className="py-4 px-4">
                       <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">
-                        {isTopUp ? tx.counterparty : title}
+                        {isTopUp ? tx.counterparty : isIncome ? tx.counterparty : title}
                       </p>
-                      {isTopUp
-                        ? <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{tx.description}</p>
-                        : location && <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{location}</p>
-                      }
+                      {isTopUp && <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{tx.description}</p>}
+                      {!isTopUp && isIncome && tx.description && (
+                        <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{tx.description}</p>
+                      )}
+                      {!isIncome && location && (
+                        <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{location}</p>
+                      )}
                     </td>
                     <td className="py-4 px-4 text-zinc-400 text-xs font-medium whitespace-nowrap">
                       {isTopUp
-                        ? <span className="opacity-50 italic">Top-up</span>
-                        : <span className="flex items-center gap-1.5">
-                            {categoryEmoji && <span className="text-base leading-none">{categoryEmoji}</span>}
-                            {time && <span className="opacity-60">{time}</span>}
-                            {!categoryEmoji && !time && <span className="opacity-40 italic">{tx.groupName || 'Direct'}</span>}
-                          </span>
+                        ? <span className="flex items-center gap-1.5"><span className="opacity-50 italic">Top-up</span>{txTime && <span className="opacity-40">{txTime}</span>}</span>
+                        : isIncome
+                          ? <span className="flex items-center gap-1.5">
+                              <span className="text-base leading-none">💸</span>
+                              {displayTime && <span className="opacity-60">{displayTime}</span>}
+                            </span>
+                          : <span className="flex items-center gap-1.5">
+                              {categoryEmoji && <span className="text-base leading-none">{categoryEmoji}</span>}
+                              {displayTime && <span className="opacity-60">{displayTime}</span>}
+                              {!categoryEmoji && !displayTime && <span className="opacity-40 italic">{tx.groupName || 'Direct'}</span>}
+                            </span>
                       }
                     </td>
-                    <td className={`py-4 px-4 text-right font-bold tabular-nums ${tx.type === 'income' ? 'text-bunq' : 'text-rose-500'}`}>
-                      {tx.type === 'income' ? '+' : '-'} € {Math.abs(tx.amount).toFixed(2)}
+                    <td className={`py-4 px-4 text-right font-bold tabular-nums ${isIncome ? 'text-bunq' : 'text-rose-500'}`}>
+                      {isIncome ? '+' : '-'} € {Math.abs(tx.amount).toFixed(2)}
                     </td>
                   </tr>
                   )
