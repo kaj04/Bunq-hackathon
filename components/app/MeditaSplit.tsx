@@ -44,7 +44,13 @@ export const MeditaSplit: React.FC = () => {
   const [balance, setBalance] = useState('0.00')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [requests, setRequests] = useState<PaymentRequest[]>([])
-  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS)
+  const [groups, setGroups] = useState<Group[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_GROUPS
+    try {
+      const saved = localStorage.getItem('meditasplit_groups')
+      return saved ? JSON.parse(saved) : INITIAL_GROUPS
+    } catch { return INITIAL_GROUPS }
+  })
   const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>(INITIAL_MEMBERS)
   const [currentUser, setCurrentUser] = useState('Me')
 
@@ -103,6 +109,10 @@ export const MeditaSplit: React.FC = () => {
   }, [])
 
   useEffect(() => { fetchData(); fetchMembers() }, [fetchData, fetchMembers])
+
+  useEffect(() => {
+    try { localStorage.setItem('meditasplit_groups', JSON.stringify(groups)) } catch { /* ignore */ }
+  }, [groups])
 
   const handleAcceptRequest = async (id: string) => {
     try {

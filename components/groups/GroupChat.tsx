@@ -21,7 +21,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
     {
       id: '1',
       sender: 'agent',
-      text: `Ciao! Sono qui per aiutarti a dividere le spese di ${group.name}.\n\nPuoi dirmi cose come:\n• "Dividi la cena di ieri tra Giorgio e Diego"\n• "Abbiamo speso €80 al ristorante, dividi tra tutti"\n• Oppure scatta una foto dello scontrino 📷`,
+      text: `Hey! I'm here to help you split expenses in ${group.name}.\n\nYou can say things like:\n• "Split last night's dinner between Giorgio and Diego"\n• "We spent €80 at the restaurant, split between everyone"\n• Or attach a photo of the receipt 📷`,
       timestamp: new Date().toISOString(),
     },
   ])
@@ -53,7 +53,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
   const processText = async (text: string) => {
     setIsProcessing(true)
     setPendingSplit(null)
-    addMessage('agent', '⏳ Sto analizzando la tua richiesta...')
+    addMessage('agent', '⏳ Analysing your request...')
     try {
       // Recupera transazioni recenti per contesto ("spese di ieri" ecc.)
       const txRes = await fetch('/api/bunq/transactions')
@@ -93,14 +93,14 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
         })
 
         setMessages(prev => prev.slice(0, -1))
-        addMessage('agent', `Ecco la divisione per "${description}":\n${splitText}\n\nTotale: €${total.toFixed(2)}\n\n✅ Confermi e invio le richieste di pagamento via Bunq?`)
+        addMessage('agent', `Here's the split for "${description}":\n${splitText}\n\nTotal: €${total.toFixed(2)}\n\n✅ Confirm and I'll send the payment requests via Bunq.`)
       } else {
         setMessages(prev => prev.slice(0, -1))
-        addMessage('agent', 'Non ho capito bene. Prova con: "Dividi €60 per la cena tra Giorgio e Diego" oppure allega una foto dello scontrino.')
+        addMessage('agent', 'I didn\'t quite get that. Try: "Split €60 for dinner between Giorgio and Diego" or attach a photo of the receipt.')
       }
     } catch {
       setMessages(prev => prev.slice(0, -1))
-      addMessage('agent', 'Qualcosa è andato storto. Riprova.')
+      addMessage('agent', 'Something went wrong. Please try again.')
     }
     setIsProcessing(false)
   }
@@ -121,7 +121,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
       })
       const data = await res.json()
       if (data.success) {
-        addMessage('agent', `✅ Fatto! Ho inviato le richieste di pagamento a ${members.map(m => m.name).join(', ')} via Bunq.\n\nRiceveranno una notifica per accettare.${data.batchId ? `\n\n🔖 Batch ID: ${data.batchId}` : ''}`)
+        addMessage('agent', `✅ Done! Payment requests sent to ${members.map(m => m.name).join(', ')} via Bunq.\n\nThey'll receive a notification to accept.${data.batchId ? `\n\n🔖 Batch ID: ${data.batchId}` : ''}`)
         if (onExpenseAdded) {
           onExpenseAdded({
             batchId: data.batchId ?? 0,
@@ -132,10 +132,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
           })
         }
       } else {
-        addMessage('agent', `⚠️ Errore nell'invio: ${data.error ?? 'unknown error'}`)
+        addMessage('agent', `⚠️ Failed to send: ${data.error ?? 'unknown error'}`)
       }
     } catch {
-      addMessage('agent', '⚠️ Errore di rete. Riprova.')
+      addMessage('agent', '⚠️ Network error. Please try again.')
     }
     setPendingSplit(null)
     setIsSending(false)
@@ -143,9 +143,9 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
 
   const startVoice = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) { alert('Il riconoscimento vocale richiede Chrome'); return }
+    if (!SR) { alert('Voice recognition requires Chrome'); return }
     const r = new SR()
-    r.lang = 'it-IT'
+    r.lang = 'en-US'
     r.continuous = false
     r.interimResults = false
     r.onresult = (e: any) => {
@@ -153,7 +153,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
       addMessage('user', `🎤 "${transcript}"`)
       processText(transcript)
     }
-    r.onerror = () => { setIsRecording(false); addMessage('agent', '⚠️ Non ho captato audio. Riprova.') }
+    r.onerror = () => { setIsRecording(false); addMessage('agent', '⚠️ No audio detected. Please try again.') }
     r.onend = () => setIsRecording(false)
     recognitionRef.current = r
     r.start()
@@ -165,8 +165,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    addMessage('user', `📷 Foto scontrino: ${file.name}`)
-    addMessage('agent', '⏳ Sto leggendo lo scontrino con Claude Vision...')
+    addMessage('user', `📷 Receipt photo: ${file.name}`)
+    addMessage('agent', '⏳ Reading receipt with Claude Vision...')
     setIsProcessing(true)
 
     const reader = new FileReader()
@@ -183,11 +183,11 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
           const { items, total } = data.data
           const itemList = items.map((i: any) => `• ${i.name}: €${i.price.toFixed(2)}`).join('\n')
           setMessages(prev => prev.slice(0, -1))
-          addMessage('agent', `Scontrino letto!\n${itemList}\n\n**Totale: €${total.toFixed(2)}**\n\nCon chi devo dividere? (es. "dividi tra Giorgio e Diego")`)
+          addMessage('agent', `Receipt scanned!\n${itemList}\n\n**Total: €${total.toFixed(2)}**\n\nWho should I split this between? (e.g. "split between Giorgio and Diego")`)
         }
       } catch {
         setMessages(prev => prev.slice(0, -1))
-        addMessage('agent', 'Non riesco a leggere lo scontrino. Prova con una foto più nitida.')
+        addMessage('agent', 'Could not read the receipt. Try a clearer photo.')
       }
       setIsProcessing(false)
     }
@@ -210,12 +210,12 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
             </div>
             <div>
               <h2 className="font-bold text-lg">{group.name}</h2>
-              <p className="text-[10px] text-bunq font-bold uppercase tracking-widest">{group.memberCount} Membri</p>
+              <p className="text-[10px] text-bunq font-bold uppercase tracking-widest">{group.memberCount} Members</p>
             </div>
           </div>
         </div>
         <button onClick={onOpenAddExpense} className="btn-primary !py-2 !px-4 text-sm">
-          + Aggiungi Spesa
+          + Add Expense
         </button>
       </div>
 
@@ -252,7 +252,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
               className="flex items-center gap-2 bg-bunq text-black font-bold text-sm px-6 py-3 rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-bunq/20 disabled:opacity-50"
             >
               <CheckCircle2 size={18} />
-              {isSending ? 'Invio in corso...' : 'Conferma e invia via Bunq'}
+              {isSending ? 'Sending...' : 'Confirm & send via Bunq'}
             </button>
           </div>
         )}
@@ -261,14 +261,14 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
       {/* Input bar */}
       <div className="p-6 pt-2">
         <div className="bg-card rounded-[28px] border border-zinc-800 p-2 pl-4 flex items-center gap-2 shadow-2xl">
-          <button onClick={() => fileRef.current?.click()} className="p-3 text-zinc-500 hover:text-white transition-colors" title="Allega foto scontrino">
+          <button onClick={() => fileRef.current?.click()} className="p-3 text-zinc-500 hover:text-white transition-colors" title="Attach receipt photo">
             <Camera size={20} />
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
 
           <input
             type="text"
-            placeholder="Descrivi la spesa o parla col microfono..."
+            placeholder="Describe the expense or use the microphone..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -283,7 +283,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
               className={`p-3 rounded-2xl transition-all ${
                 isRecording ? 'bg-rose-500 text-white animate-pulse' : 'text-zinc-500 hover:text-bunq hover:bg-white/5'
               }`}
-              title={isRecording ? 'Stop registrazione' : 'Registra messaggio vocale'}
+              title={isRecording ? 'Stop recording' : 'Record voice message'}
             >
               <Mic size={20} />
             </button>
@@ -297,7 +297,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
           </div>
         </div>
         <p className="text-center text-[10px] text-zinc-600 mt-3 font-bold uppercase tracking-widest">
-          🎤 Parla in italiano · 📷 Allega scontrino · ✍️ Scrivi
+          🎤 Speak · 📷 Attach receipt · ✍️ Type
         </p>
       </div>
     </div>
