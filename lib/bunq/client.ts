@@ -4,10 +4,11 @@ import {
   loadDevice, saveDevice,
   loadSession, saveSession, clearSession,
 } from './session-store'
+import { MOCK_CONTACTS } from './mock-data'
+import { isMock } from '@/lib/mock-flag'
 import type { BunqContact, PaymentRequest } from '@/types'
 
 const BASE_URL = 'https://public-api.sandbox.bunq.com/v1'
-const MOCK = process.env.BUNQ_MOCK === 'true'
 
 // ─── In-memory state ─────────────────────────────────────────────────────────
 // Sopravvive tra le chiamate nello stesso processo Next.js; si resetta su cold start.
@@ -168,7 +169,7 @@ export async function initBunq() {
 
 /** Pagamento diretto (simulazione spesa personale) — appare nelle transazioni */
 export async function makePayment(amount: number, description: string) {
-  if (MOCK) {
+  if (isMock()) {
     MOCK_TRANSACTIONS.unshift({
       id: Date.now(),
       amount: `-${amount.toFixed(2)}`,
@@ -191,7 +192,7 @@ export async function makePayment(amount: number, description: string) {
 
 /** Invia richiesta di pagamento a una persona */
 export async function createPaymentRequest(req: PaymentRequest) {
-  if (MOCK) { console.log(`[MOCK] Request €${req.amount} → ${req.recipientAlias}`); return { mock: true } }
+  if (isMock()) { console.log(`[MOCK] Request €${req.amount} → ${req.recipientAlias}`); return { mock: true } }
   await initBunq()
   return bunqReq('POST', `/user/${_s.userId}/monetary-account/${_s.accountId}/request-inquiry`, {
     amount_inquired: { value: req.amount.toFixed(2), currency: req.currency },
@@ -203,7 +204,7 @@ export async function createPaymentRequest(req: PaymentRequest) {
 
 /** Invia richieste di pagamento a più persone in una volta (split di gruppo) */
 export async function createGroupSplit(requests: PaymentRequest[]) {
-  if (MOCK) {
+  if (isMock()) {
     const total = requests.reduce((s, r) => s + r.amount, 0)
     const batchId = Date.now()
     MOCK_TRANSACTIONS.unshift({
@@ -235,7 +236,7 @@ export async function createGroupSplit(requests: PaymentRequest[]) {
 
 /** Saldo e info account corrente */
 export async function getBalance() {
-  if (MOCK) return [{ name: 'Main Account', balance: '1000.00', currency: 'EUR' }]
+  if (isMock()) return [{ name: 'Main Account', balance: '1000.00', currency: 'EUR' }]
   await initBunq()
   const res = await bunqReq('GET', `/user/${_s.userId}/monetary-account`)
   return res.Response.map((r: any) => {
@@ -246,7 +247,7 @@ export async function getBalance() {
 
 /** IBAN e nome dell'account corrente (per il funding) */
 export async function getMyAccountInfo(): Promise<{ iban: string; name: string } | null> {
-  if (MOCK) return { iban: 'NL00BUNQ0123456789', name: 'Francesco Test' }
+  if (isMock()) return { iban: 'NL00BUNQ0123456789', name: 'Francesco Test' }
   await initBunq()
   const res = await bunqReq('GET', `/user/${_s.userId}/monetary-account`)
   const acc = res.Response[0]?.MonetaryAccountBank
@@ -257,7 +258,7 @@ export async function getMyAccountInfo(): Promise<{ iban: string; name: string }
 
 /** Ultime transazioni */
 export async function getTransactions(count = 20) {
-  if (MOCK) return MOCK_TRANSACTIONS
+  if (isMock()) return MOCK_TRANSACTIONS
   await initBunq()
   const res = await bunqReq('GET', `/user/${_s.userId}/monetary-account/${_s.accountId}/payment`)
   return res.Response.slice(0, count).map((r: any) => {
@@ -276,7 +277,7 @@ export async function getTransactions(count = 20) {
 
 /** Richieste di pagamento in arrivo (che devo accettare) */
 export async function getIncomingRequests() {
-  if (MOCK) return MOCK_REQUESTS
+  if (isMock()) return MOCK_REQUESTS
   await initBunq()
   const res = await bunqReq('GET', `/user/${_s.userId}/monetary-account/${_s.accountId}/request-response`)
   return res.Response.map((r: any) => {
@@ -295,7 +296,7 @@ export async function getIncomingRequests() {
 
 /** Accetta una richiesta di pagamento in arrivo */
 export async function acceptPaymentRequest(requestResponseId: number) {
-  if (MOCK) { console.log(`[MOCK] Accepted request ${requestResponseId}`); return { mock: true } }
+  if (isMock()) { console.log(`[MOCK] Accepted request ${requestResponseId}`); return { mock: true } }
   await initBunq()
   return bunqReq('PUT', `/user/${_s.userId}/monetary-account/${_s.accountId}/request-response/${requestResponseId}`, {
     status: 'ACCEPTED',
@@ -303,19 +304,22 @@ export async function acceptPaymentRequest(requestResponseId: number) {
 }
 
 export async function getBunqContacts(): Promise<BunqContact[]> {
-  if (MOCK) return [
-    { name: 'Giorgio',   alias: 'giorgio@sandbox.com' },
-    { name: 'Vaggelis',  alias: 'vaggelis@sandbox.com' },
-    { name: 'Diego',     alias: 'diego@sandbox.com' },
-  ]
+  return MOCK_CONTACTS
+}
+
+export async function getBunqSession(): Promise<{ userId: number; accountId: number }> {
   await initBunq()
-  return SANDBOX_USERS.filter(u => u.userId !== _s.userId)
-    .map(u => ({ name: u.name, alias: u.alias }))
+  return { userId: _s.userId, accountId: _s.accountId }
+}
+
+export async function bunqGetPublic(path: string) {
+  await initBunq()
+  return bunqReq('GET', path)
 }
 
 /** Fetch email alias for a specific sandbox userId */
 export async function getSandboxUserEmail(userId: number): Promise<string | null> {
-  if (MOCK) {
+  if (isMock()) {
     const u = SANDBOX_USERS.find(u => u.userId === userId)
     return u?.alias ?? null
   }
@@ -333,7 +337,7 @@ export async function getSandboxUserEmail(userId: number): Promise<string | null
 
 /** Resolve email aliases for all known sandbox members */
 export async function resolveMemberAliases(): Promise<{ name: string; userId: number; alias: string }[]> {
-  if (MOCK) return SANDBOX_USERS
+  if (isMock()) return SANDBOX_USERS
   const results = await Promise.all(
     SANDBOX_USERS.map(async u => {
       const email = await getSandboxUserEmail(u.userId)

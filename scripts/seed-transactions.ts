@@ -1,6 +1,7 @@
 /**
  * OWNER: Francesco
  * Crea transazioni fake tra i 4 utenti sandbox per testare l'agente.
+ * Include scenari realistici in italiano e inglese, con casi-limite per il testing.
  *
  * Esegui con: npx tsx scripts/seed-transactions.ts
  */
@@ -32,7 +33,7 @@ function sign(data: string, privateKey: string) {
   return crypto.createSign('SHA256').update(data).sign(privateKey, 'base64')
 }
 
-function buildHeaders(privateKey: string, publicKey: string, token?: string, method = 'POST', path = '', body = '') {
+function buildHeaders(privateKey: string, _publicKey: string, token?: string, method = 'POST', path = '', body = '') {
   const h: Record<string, string> = {
     'Cache-Control': 'no-cache',
     'User-Agent': 'BunqSeed/1.0',
@@ -77,22 +78,18 @@ async function loginUser(user: typeof USERS[0]) {
   console.log(`\nLogging in ${user.name}...`)
   const { privateKey, publicKey } = generateKeys()
 
-  // Step 1: Installation
   const installRes = await bunqPost('/installation', { client_public_key: publicKey }, undefined, '', publicKey)
   const installToken = installRes.Response.find((r: any) => r.Token)?.Token.token
 
-  // Step 2: Device
   await bunqPost('/device-server', {
     description: `seed-${user.name}`,
     secret: user.apiKey,
     permitted_ips: ['*'],
   }, installToken, privateKey, publicKey)
 
-  // Step 3: Session
   const sessionRes = await bunqPost('/session-server', { secret: user.apiKey }, installToken, privateKey, publicKey)
   const sessionToken = sessionRes.Response.find((r: any) => r.Token)?.Token.token
 
-  // Step 4: Get account
   const accRes = await bunqGet(`/user/${user.userId}/monetary-account`, sessionToken, privateKey, publicKey)
   const accountId = accRes.Response[0]?.MonetaryAccountBank?.id
 
@@ -113,18 +110,17 @@ async function createPayment(fromName: string, toUserId: number, amount: number,
     from.token, from.privateKey, from.publicKey,
   )
   const toUser = USERS.find(u => u.userId === toUserId)!
-  console.log(`  💸 ${fromName} → ${toUser.name}: €${amount} (${description})`)
+  console.log(`  💸 ${fromName} → ${toUser.name}: €${amount.toFixed(2)} (${description})`)
 }
 
 async function main() {
   console.log('=== Bunq Seed Script ===')
   console.log('Logging in all 4 users...')
 
-  // Login tutti gli utenti
   for (const user of USERS) {
     try {
       await loginUser(user)
-      await new Promise(r => setTimeout(r, 1000)) // evita rate limit
+      await new Promise(r => setTimeout(r, 1000))
     } catch (e) {
       console.error(`✗ ${user.name} login failed:`, e)
     }
@@ -132,16 +128,36 @@ async function main() {
 
   console.log('\nCreating fake transactions...')
 
-  // Transazioni fake realistiche — cena al ristorante
-  const scenarios = [
-    { from: 'Francesco', to: 3628489, amount: 25.50, desc: 'Cena da Mario - pizza' },
-    { from: 'Giorgio',   to: 3628453, amount: 18.00, desc: 'Cena da Mario - pasta' },
-    { from: 'Vaggelis',  to: 3628491, amount: 12.50, desc: 'Aperitivo bar centro' },
-    { from: 'Diego',     to: 3628453, amount: 34.00, desc: 'Taxi condiviso aeroporto' },
-    { from: 'Francesco', to: 3628490, amount: 8.50,  desc: 'Caffè e cornetti' },
-    { from: 'Giorgio',   to: 3628491, amount: 45.00, desc: 'Supermercato spesa settimana' },
-    { from: 'Vaggelis',  to: 3628453, amount: 22.00, desc: 'Cinema biglietti x4' },
-    { from: 'Diego',     to: 3628489, amount: 15.75, desc: 'Pranzo hackathon' },
+  // Each scenario: fromName pays toUserId (Giorgio = 3628489, Francesco = 3628453, Vaggelis = 3628490, Diego = 3628491)
+  const scenarios: { from: string; to: number; amount: number; desc: string }[] = [
+    // ── Yesterday ────────────────────────────────────────────────────────────
+    { from: 'Giorgio',   to: 3628453, amount: 25.00, desc: 'Bar Centrale - birre' },
+    { from: 'Giorgio',   to: 3628453, amount: 48.50, desc: 'Pizzeria da Mario' },
+    { from: 'Giorgio',   to: 3628491, amount: 34.00, desc: 'Taxi Uber - aeroporto' },
+    { from: 'Giorgio',   to: 3628490, amount: 12.50, desc: 'Starbucks coffee' },
+
+    // ── 2 days ago ────────────────────────────────────────────────────────────
+    { from: 'Francesco', to: 3628489, amount: 92.00, desc: 'Cena Osteria del Porto' },
+    { from: 'Francesco', to: 3628491, amount: 35.00, desc: 'Brunch Café Roma' },
+
+    // ── 3 days ago — two aperitivo payments (ambiguous date test) ────────────
+    { from: 'Diego',     to: 3628453, amount: 18.00, desc: 'Aperitivo Spritz Bar' },
+    { from: 'Diego',     to: 3628490, amount: 22.00, desc: 'Aperitivo Bar Sport' },
+
+    // ── 4 days ago ────────────────────────────────────────────────────────────
+    { from: 'Vaggelis',  to: 3628453, amount: 67.30, desc: 'Supermercato Esselunga' },
+    { from: 'Vaggelis',  to: 3628491, amount: 42.00, desc: 'Hackathon lunch - De Balie' },
+
+    // ── 5 days ago ────────────────────────────────────────────────────────────
+    { from: 'Francesco', to: 3628489, amount: 78.00, desc: 'Sushi restaurant Yoshimi' },
+    { from: 'Diego',     to: 3628453, amount: 40.00, desc: 'Bowling The Alley' },
+
+    // ── 6 days ago ────────────────────────────────────────────────────────────
+    { from: 'Giorgio',   to: 3628491, amount: 55.00, desc: 'The Irish Pub - drinks' },
+
+    // ── 7 days ago ────────────────────────────────────────────────────────────
+    { from: 'Francesco', to: 3628489, amount: 120.00, desc: 'Cena ristorante La Pergola' },
+    { from: 'Vaggelis',  to: 3628453, amount: 53.80,  desc: 'Grocery Jumbo supermarkt' },
   ]
 
   for (const s of scenarios) {
@@ -153,8 +169,14 @@ async function main() {
     }
   }
 
-  console.log('\n✓ Seed completato! Transazioni create nel sandbox Bunq.')
-  console.log('Ora puoi testare gli agenti con dati reali.')
+  console.log('\n✓ Seed completato! 15 transazioni create nel sandbox Bunq.')
+  console.log('\nScenari disponibili per il test:')
+  console.log('  • "Dividi le birre di ieri con Francesco e Diego"')
+  console.log('  • "Split yesterday\'s pizza with Vaggelis"')
+  console.log('  • "Ho pagato io la cena all\'Osteria 2 giorni fa, dividila con tutti"')
+  console.log('  • "Dividi l\'aperitivo di 3 giorni fa con Francesco" → chiede quale bar')
+  console.log('  • "Split the sushi from 5 days ago with Diego and Giorgio"')
+  console.log('  • "Dividi la spesa di 4 giorni fa con Diego e Vaggelis"')
 }
 
 main().catch(console.error)

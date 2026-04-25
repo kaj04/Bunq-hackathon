@@ -38,3 +38,23 @@ export type BunqContact = {
 export type ApiResponse<T> =
   | { success: true; data: T }
   | { success: false; error: string }
+
+export type BunqPayment = {
+  id: number
+  description: string
+  amount: { value: string; currency: string }
+  created: string
+  counterparty_alias: { display_name: string }
+}
+
+export type SplitProposal = {
+  paymentDescription: string
+  total: number
+  currency: string
+  splits: Array<{ participant: { name: string; bunqAlias?: string }; amount: number }>
+}
+
+export type AgentResponse =
+  | { state: 'proposal'; proposal: SplitProposal }
+  | { state: 'needs_input'; question: string; history: any[] }
+  | { state: 'error'; error: string }
