@@ -10,9 +10,11 @@ interface GroupsGridProps {
   availableContacts: GroupMember[]
   onSelectGroup: (group: Group) => void
   onCreateGroup: (name: string, emoji: string, color: string, members: GroupMember[]) => void
+  currentUser?: string
+  currentUserAlias?: string
 }
 
-export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContacts, onSelectGroup, onCreateGroup }) => {
+export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContacts, onSelectGroup, onCreateGroup, currentUser, currentUserAlias }) => {
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newEmoji, setNewEmoji] = useState('🌍')
@@ -43,7 +45,12 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
   const handleCreate = () => {
     if (!newName.trim()) return
     const fromContacts = availableContacts.filter(c => selectedNames.has(c.name))
-    const members = [...fromContacts, ...manualMembers]
+    let members: GroupMember[] = [...fromContacts, ...manualMembers]
+    // Always include the creator — they can never be excluded
+    if (currentUser && !members.some(m => m.name === currentUser)) {
+      const selfContact = availableContacts.find(c => c.name === currentUser)
+      members = [{ name: currentUser, alias: selfContact?.alias ?? currentUserAlias ?? '' }, ...members]
+    }
     onCreateGroup(newName.trim(), newEmoji, newColor, members)
     setNewName('')
     setNewEmoji('🌍')
@@ -113,27 +120,33 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Members</p>
                 <div className="flex flex-wrap gap-2">
                   {availableContacts.map(contact => {
-                    const selected = selectedNames.has(contact.name)
+                    const isMe = contact.name === currentUser
+                    const selected = isMe || selectedNames.has(contact.name)
                     return (
                       <button
                         key={contact.name}
-                        onClick={() => toggleMember(contact.name)}
+                        onClick={() => !isMe && toggleMember(contact.name)}
+                        disabled={isMe}
+                        title={isMe ? 'You are always included as the group creator' : undefined}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                          selected
-                            ? 'bg-bunq/20 border-bunq/60 text-white'
-                            : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70'
+                          isMe
+                            ? 'bg-bunq/20 border-bunq/60 text-white cursor-default'
+                            : selected
+                              ? 'bg-bunq/20 border-bunq/60 text-white'
+                              : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70'
                         }`}
                       >
                         <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${selected ? 'bg-bunq text-white' : 'bg-white/10 text-white/50'}`}>
                           {selected ? <Check size={10} /> : contact.name.charAt(0)}
                         </span>
                         {contact.name}
+                        {isMe && <span className="opacity-50 text-[9px]">you</span>}
                       </button>
                     )
                   })}
                 </div>
                 <p className="text-[10px] text-white/20 mt-2">
-                  {selectedNames.size} of {availableContacts.length} selected
+                  {selectedNames.size + 1} of {availableContacts.length} selected
                 </p>
               </div>
             )}

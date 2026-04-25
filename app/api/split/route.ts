@@ -102,6 +102,10 @@ async function runToolUseLoop(
           const found = await searchRecentPayments(term, Math.ceil(days))
           payments.push(...found)
         }
+        // Filter: only outgoing payments (expenses). Top-ups / incoming transfers
+        // are always positive and should never appear in a split suggestion.
+        payments = payments.filter(p => parseFloat(p.amount.value) < 0)
+
         // Deduplicate by id
         const seen = new Set<number>()
         payments = payments.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true })
@@ -167,7 +171,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
 
     // ── Receipt path: no tool use needed ─────────────────────────────────────
     if (receipt) {
-      const prompt = SPLIT_PROMPT_WITH_RECEIPT(JSON.stringify(receipt), participantNames, voiceInput ?? '', speaker)
+      const prompt = SPLIT_PROMPT_WITH_RECEIPT(JSON.stringify(receipt), participantNames, voiceInput ?? '', speaker, typedHistory)
       const response = await client.messages.create({
         model: 'claude-sonnet-4-6',
         max_tokens: 1024,

@@ -266,6 +266,8 @@ export const MeditaSplit: React.FC = () => {
               availableContacts={availableContacts}
               onSelectGroup={setSelectedGroup}
               onCreateGroup={handleCreateGroup}
+              currentUser={currentUser}
+              currentUserAlias={currentUserAlias ?? undefined}
             />
           )}
 

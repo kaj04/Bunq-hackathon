@@ -53,8 +53,11 @@ export const GroupChat: React.FC<GroupChatProps> = ({
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
-  const msgIdRef = useRef(0)
+  const msgIdRef = useRef(Date.now())
   const knownIdsRef = useRef<Set<string>>(new Set(['welcome']))
+  // Stable refs so useCallback closures never capture stale state
+  const addMessageRef = useRef<(sender: 'user' | 'agent', text: string, persist?: boolean, widgets?: Widget[], attachment?: ChatMessage['attachment']) => ChatMessage>(null as any)
+  const processTextRef = useRef<(text: string) => Promise<void>>(null as any)
 
   // Load chat from server on mount
   const fetchChat = useCallback(async () => {
@@ -89,7 +92,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
-  const addMessage = (sender: 'user' | 'agent', text: string, persist = true, widgets?: Widget[]): ChatMessage => {
+  const addMessage = (
+    sender: 'user' | 'agent',
+    text: string,
+    persist = true,
+    widgets?: Widget[],
+    attachment?: ChatMessage['attachment'],
+  ): ChatMessage => {
     const msg: ChatMessage = {
       id: String(++msgIdRef.current),
       sender,
@@ -97,6 +106,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({
       text,
       timestamp: new Date().toISOString(),
       ...(widgets?.length ? { widgets } : {}),
+      ...(attachment ? { attachment } : {}),
     }
     setMessages(prev => [...prev, msg])
     knownIdsRef.current.add(msg.id)
@@ -178,22 +188,37 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     setIsProcessing(false)
   }
 
+  // Sync refs after every render so startVoice's callback always has the latest state
+  addMessageRef.current = addMessage
+  processTextRef.current = processText
+
   const confirmSplit = async () => {
-    if (!pendingSplit) return
+    if (!pendingSplit || isSending) return
+    // Capture and clear immediately — prevents double-click from firing twice
+    const split = pendingSplit
+    setPendingSplit(null)
     setIsSending(true)
     try {
       // Exclude current user by alias (exact) or name (fallback)
-      const recipients = pendingSplit.splits.filter(s => {
+      const recipients = split.splits.filter(s => {
         if (currentUserAlias && s.alias === currentUserAlias) return false
         if (!currentUserAlias && s.name === currentUser) return false
         return true
       })
+
+      // Fix 2: self-payment guard
+      if (recipients.length === 0) {
+        addMessage('agent', "⚠️ All participants in this split are you — there's no one to send a request to. Add other group members to the split.")
+        setIsSending(false)
+        return
+      }
+
       const res = await fetch('/api/bunq/split-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          description: pendingSplit.description,
-          totalAmount: pendingSplit.total,
+          description: split.description,
+          totalAmount: split.total,
           members: recipients,
         }),
       })
@@ -203,13 +228,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({
         addMessage('agent', `✅ Done! Payment requests sent to ${sentTo} via Bunq.\n\nThey'll receive a notification to accept.${data.batchId ? `\n\n🔖 Batch ID: ${data.batchId}` : ''}`)
         setHistory(prev => [...prev, {
           userText: '(confirmed split)',
-          agentSummary: `Sent Bunq requests for "${pendingSplit.description}" €${pendingSplit.total.toFixed(2)} → ${sentTo}. Batch ID: ${data.batchId ?? 'n/a'}`,
+          agentSummary: `Sent Bunq requests for "${split.description}" €${split.total.toFixed(2)} → ${sentTo}. Batch ID: ${data.batchId ?? 'n/a'}`,
         }])
         if (onExpenseAdded) {
           onExpenseAdded({
             batchId: data.batchId ?? 0,
-            description: pendingSplit.description,
-            total: pendingSplit.total,
+            description: split.description,
+            total: split.total,
             date: new Date().toISOString().slice(0, 10),
             splits: recipients,
           })
@@ -220,7 +245,6 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     } catch {
       addMessage('agent', '⚠️ Network error. Please try again.')
     }
-    setPendingSplit(null)
     setIsSending(false)
   }
 
@@ -233,22 +257,24 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     r.interimResults = false
     r.onresult = (e: any) => {
       const transcript = e.results[0][0].transcript
-      addMessage('user', `🎤 "${transcript}"`)
-      processText(transcript)
+      // Use refs so we always get the latest pendingReceipt / history state
+      addMessageRef.current('user', `🎤 "${transcript}"`)
+      processTextRef.current(transcript)
     }
-    r.onerror = () => { setIsRecording(false); addMessage('agent', '⚠️ No audio detected. Please try again.') }
+    r.onerror = () => { setIsRecording(false); addMessageRef.current('agent', '⚠️ No audio detected. Please try again.') }
     r.onend = () => setIsRecording(false)
     recognitionRef.current = r
     r.start()
     setIsRecording(true)
-  }, [group])
+  }, [])
 
   const stopVoice = () => { recognitionRef.current?.stop(); setIsRecording(false) }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    addMessage('user', `📷 Receipt photo: ${file.name}`)
+    const previewUrl = URL.createObjectURL(file)
+    addMessage('user', '', true, undefined, { type: 'receipt', url: previewUrl })
     addMessage('agent', '⏳ Reading receipt with Claude Vision...', false)
     setIsProcessing(true)
     const reader = new FileReader()
@@ -263,6 +289,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({
         const data = await res.json()
         if (data.success) {
           const { items, total } = data.data
+          // Fix 9: reject non-receipts or unreadable images
+          if (!items?.length || total === 0) {
+            setMessages(prev => prev.slice(0, -1))
+            addMessage('agent', "⚠️ That doesn't look like a receipt, or the text wasn't clear enough to read. Try a better-lit, straight-on photo of just the receipt.")
+            setIsProcessing(false)
+            return
+          }
           setPendingReceipt({ items, total })
           const itemList = items.map((i: any) => `• ${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}: €${i.price.toFixed(2)}`).join('\n')
           const memberNames = group.members.map(m => m.name)
@@ -444,16 +477,27 @@ export const GroupChat: React.FC<GroupChatProps> = ({
                   {isAgent ? 'AI' : (msg.senderName?.charAt(0) ?? '?')}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                  <div className={`rounded-2xl text-sm leading-relaxed whitespace-pre-line overflow-hidden ${
                     isOwnMessage
                       ? 'bg-bunq/10 border border-bunq/20 text-white'
                       : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
                   }`}>
-                    {!isAgent && !isOwnMessage && msg.senderName && (
-                      <p className="text-[10px] font-bold text-bunq uppercase tracking-widest mb-1">{msg.senderName}</p>
+                    {msg.attachment?.type === 'receipt' && msg.attachment.url && (
+                      <img
+                        src={msg.attachment.url}
+                        alt="Receipt"
+                        className="w-full max-w-[260px] max-h-64 object-cover block"
+                      />
                     )}
-                    {msg.text}
-                    <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
+                    {msg.text && (
+                      <div className="p-4">
+                        {!isAgent && !isOwnMessage && msg.senderName && (
+                          <p className="text-[10px] font-bold text-bunq uppercase tracking-widest mb-1">{msg.senderName}</p>
+                        )}
+                        {msg.text}
+                      </div>
+                    )}
+                    <p className={`text-[8px] opacity-30 font-bold uppercase ${msg.text ? '-mt-2 pb-3 px-4' : 'p-2 text-right'}`}>
                       {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -496,7 +540,9 @@ export const GroupChat: React.FC<GroupChatProps> = ({
       <div className="p-6 pt-2 space-y-3">
         {pendingReceipt && (
           <div className="flex items-center justify-between bg-bunq/10 border border-bunq/30 rounded-2xl px-4 py-2.5">
-            <span className="text-xs text-bunq font-semibold">🧾 Receipt loaded — tell me who gets what</span>
+            <span className="text-xs text-bunq font-semibold">
+              🧾 Receipt mode — {pendingReceipt.items.length} items · €{pendingReceipt.total.toFixed(2)} · tell me who gets what
+            </span>
             <button onClick={() => setPendingReceipt(null)} className="text-zinc-500 hover:text-white transition-colors ml-3">
               <X size={14} />
             </button>

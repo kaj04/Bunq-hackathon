@@ -141,83 +141,137 @@
       ]
     }
   ],
-  "1777101581166": [
+  "1777103826109": [
     {
       "id": "1",
       "sender": "user",
-      "senderName": "Diego",
-      "text": "divide taxi with all, I paid for everyone",
-      "timestamp": "2026-04-25T07:20:02.606Z"
+      "senderName": "Francesco",
+      "text": "📷 Receipt photo: ReceiptSwiss.jpg",
+      "timestamp": "2026-04-25T07:57:15.432Z"
     },
     {
       "id": "3",
       "sender": "agent",
       "senderName": "AI",
-      "text": "Here's the split for \"Taxi Uber shared airport ride — paid by Diego for all 3\":\n• Vaggelis: €11.33\n• Giorgio: €11.33\n• Diego: €11.34\n\nTotal: €34.00\n\n✅ Confirm and I'll send the payment requests via Bunq.",
-      "timestamp": "2026-04-25T07:20:10.650Z"
+      "text": "Receipt scanned! 🧾\n\n• Latte Macchiato ×2: €4.50\n• Gloki: €5.00\n• Schweinschnitzel: €22.00\n• Chässpätzli: €18.50\n\nTotal: €54.50\n\nHow should I split this?",
+      "timestamp": "2026-04-25T07:57:19.139Z",
+      "widgets": [
+        {
+          "label": "✂️ Split equally among all (Vaggelis, Francesco, Diego, Giorgio)",
+          "value": "Split the receipt equally among Vaggelis, Francesco, Diego, Giorgio"
+        },
+        {
+          "label": "📋 I'll describe who ordered what",
+          "value": "Let me tell you who ordered what from this receipt"
+        },
+        {
+          "label": "👥 Split between some members",
+          "value": "Who should split this receipt?"
+        }
+      ]
     },
     {
       "id": "4",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "✅ Done! Payment requests sent to Vaggelis, Giorgio via Bunq.\n\nThey'll receive a notification to accept.\n\n🔖 Batch ID: 1777101613767",
-      "timestamp": "2026-04-25T07:20:13.772Z"
+      "sender": "user",
+      "senderName": "Francesco",
+      "text": "🎤 \"I get a latte macchiato and Diego pay the rest\"",
+      "timestamp": "2026-04-25T07:57:38.175Z"
     },
     {
-      "id": "5",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "now divide yesterday dinner between al",
-      "timestamp": "2026-04-25T07:20:33.128Z"
+      "id": "6",
+      "sender": "agent",
+      "senderName": "AI",
+      "text": "Here's the split for \"I get a latte macchiato and Diego pay the rest\":\n• Francesco: €4.50\n• Diego: €50.00\n\nTotal: €54.50\n\n✅ Confirm to send payment requests via Bunq.",
+      "timestamp": "2026-04-25T07:57:40.475Z"
     },
     {
       "id": "7",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "I couldn't determine who to split with. Please name group members or provide an amount.",
-      "timestamp": "2026-04-25T07:20:39.963Z"
+      "sender": "user",
+      "senderName": "Francesco",
+      "text": "wait, I also pay the Gloki",
+      "timestamp": "2026-04-25T07:59:41.390Z"
     },
     {
-      "id": "8",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "all of us",
-      "timestamp": "2026-04-25T07:20:52.857Z"
+      "id": "9",
+      "sender": "agent",
+      "senderName": "AI",
+      "text": "No payment found for 'Gloki'. Please provide the amount or double-check the name.",
+      "timestamp": "2026-04-25T07:59:47.594Z",
+      "widgets": [
+        {
+          "label": "💰 Enter amount manually",
+          "value": "I also pay the Gloki for €[amount], split with Diego"
+        },
+        {
+          "label": "🔍 Try a different name",
+          "value": "I also pay the [correct name] split with Diego"
+        }
+      ]
     },
     {
       "id": "10",
       "sender": "agent",
       "senderName": "AI",
-      "text": "Got it — you want to split among all of you (Vaggelis, Diego, Giorgio)! But I'm missing a couple of details:\n\n1. **What expense** are you splitting? (e.g. dinner, taxi, drinks)\n2. **What's the amount?** Or was it a recent payment I should look up?",
-      "timestamp": "2026-04-25T07:20:56.418Z"
+      "text": "✅ Done! Payment requests sent to Vaggelis, Diego, Giorgio via Bunq.\n\nThey'll receive a notification to accept.\n\n🔖 Batch ID: 1777104246222",
+      "timestamp": "2026-04-25T08:04:06.224Z"
     },
     {
       "id": "11",
       "sender": "user",
-      "senderName": "Diego",
-      "text": "yesterda",
-      "timestamp": "2026-04-25T07:21:12.809Z"
+      "senderName": "Francesco",
+      "text": "share flight to London payment among Luca and Diego",
+      "timestamp": "2026-04-25T08:04:32.278Z"
     },
     {
       "id": "13",
       "sender": "agent",
       "senderName": "AI",
-      "text": "Here's the split for \"Pizza dinner da Mario — paid by Diego for all 3\":\n• Vaggelis: €32.00\n• Giorgio: €32.00\n\nTotal: €64.00\n\n✅ Confirm and I'll send the payment requests via Bunq.",
-      "timestamp": "2026-04-25T07:21:20.872Z"
-    },
+      "text": "Two problems: (1) 'Luca' is not in the authorized group and cannot be included in a split. (2) No flight to London payment was found in recent history — please provide the amount manually.",
+      "timestamp": "2026-04-25T08:04:41.573Z",
+      "widgets": [
+        {
+          "label": "💸 Split flight among Diego only",
+          "value": "Split the flight to London equally among Diego"
+        },
+        {
+          "label": "💸 Split flight among Diego & Giorgio",
+          "value": "Split the flight to London equally among Diego and Giorgio"
+        },
+        {
+          "label": "💸 Split flight among Diego & Vaggelis",
+          "value": "Split the flight to London equally among Diego and Vaggelis"
+        },
+        {
+          "label": "✏️ Enter amount manually",
+          "value": "Split €___ for the flight to London among Diego"
+        }
+      ]
+    }
+  ],
+  "1777105444584": [
     {
-      "id": "14",
+      "id": "1777105447624",
       "sender": "user",
-      "senderName": "Diego",
-      "text": "remove vaggelis",
-      "timestamp": "2026-04-25T07:21:34.084Z"
+      "senderName": "Francesco",
+      "text": "hey banq,  split last night bill between me and Gio",
+      "timestamp": "2026-04-25T08:24:30.602Z"
     },
     {
-      "id": "16",
+      "id": "1777105447626",
       "sender": "agent",
       "senderName": "AI",
-      "text": "I couldn't determine who to split with. Please name group members or provide an amount.",
-      "timestamp": "2026-04-25T07:21:36.651Z"
+      "text": "I couldn't find any payment from last night matching a bill or dinner. Please enter the amount manually or try a different keyword.",
+      "timestamp": "2026-04-25T08:24:43.450Z",
+      "widgets": [
+        {
+          "label": "✍️ Enter amount manually",
+          "value": "Split last night's bill for €??? between me and Giorgio"
+        },
+        {
+          "label": "🔍 Try a different keyword",
+          "value": "Split last night's bar|pub|drinks bill between me and Giorgio"
+        }
+      ]
     }
   ]
 }

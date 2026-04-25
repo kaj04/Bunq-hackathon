@@ -27,14 +27,18 @@
     "totalSpent": 0
   },
   {
-    "id": "1777101581166",
-    "name": "yyyyyyy",
+    "id": "1777103826109",
+    "name": "uuiuiihhih",
     "emoji": "🌍",
     "color": "#00a86b",
     "members": [
       {
         "name": "Vaggelis",
         "alias": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com"
+      },
+      {
+        "name": "Francesco",
+        "alias": "test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com"
       },
       {
         "name": "Diego",
@@ -47,25 +51,57 @@
     ],
     "expenses": [
       {
-        "batchId": 1777101613767,
-        "description": "Taxi Uber shared airport ride — paid by Diego for all 3",
-        "total": 34,
+        "batchId": 1777104246222,
+        "description": "Split the receipt equally among Vaggelis, Francesco, Diego, Giorgio",
+        "total": 54.5,
         "date": "2026-04-25",
         "splits": [
           {
             "name": "Vaggelis",
             "alias": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com",
-            "amount": 11.33
+            "amount": 13.63
+          },
+          {
+            "name": "Diego",
+            "alias": "diego@sandbox.com",
+            "amount": 13.62
           },
           {
             "name": "Giorgio",
             "alias": "giorgio@sandbox.com",
-            "amount": 11.33
+            "amount": 13.62
           }
         ]
       }
     ],
-    "memberCount": 3,
-    "totalSpent": 34
+    "memberCount": 4,
+    "totalSpent": 54.5
+  },
+  {
+    "id": "1777105444584",
+    "name": "ROMAROMAROMAAAA",
+    "emoji": "🍔",
+    "color": "#00a86b",
+    "members": [
+      {
+        "name": "Vaggelis",
+        "alias": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com"
+      },
+      {
+        "name": "Francesco",
+        "alias": "test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com"
+      },
+      {
+        "name": "Diego",
+        "alias": "diego@sandbox.com"
+      },
+      {
+        "name": "Giorgio",
+        "alias": "giorgio@sandbox.com"
+      }
+    ],
+    "expenses": [],
+    "memberCount": 4,
+    "totalSpent": 0
   }
 ]
