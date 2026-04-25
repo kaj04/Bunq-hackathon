@@ -1,0 +1,44 @@
+{
+  "Vaggelis": {
+    "name": "Vaggelis",
+    "apiKey": "sandbox_a5fea908292caeea091ba54a823fd627d13980a82e1a74dd3cfdd41c",
+    "userId": 3629243,
+    "accountId": 3621234,
+    "email": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com",
+    "balance": "0.00",
+    "device": {
+      "privateKey": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDUMDH9+JLgB9q4\nQm25VZGTQ1bP9k1IKne83aRv0KdfPWJeN+jEAgHzmQYJPAEHqrpohjGS5tY9cZHG\nem5ClBL5oHPBs+i4khi5wTnlJrPvHSvtffDcUNzxDhvYJNTnVS9+X4tBQIxrdrHE\n1lCP0rhzjpZBvY7L2pSuRgZjxjmDytcsXecbmgU5yQO8Ecx5Jz/qC9i+uUyNe807\nDh6hiJ5mkBe1FbZu5e7KAXC3mBP5f+n4QvisO68/2gCNtf1LatrSnljlb9LDWLVr\nxTHpaeXz7HFE74fQXDOn4ZP3SbvVOfzgFmpdqvhOgy4EgEmas5PmLro9BUakwlJk\nec+IagcZAgMBAAECggEABTNEg7hsBRXm3DLd6eJj0HZLMjU+R0v/Jj+lBYvZZkH6\nCgbDFiFZzI9jW1Dp/OGdcu1YWVoomwCQYDW6Q7h0T0OJmBA23mXPjvyM1NsMzYnr\nUdqPJMnN4xHY8y79PB7VgfqJI6ls0j9qSOwwX5im+5yy0wajHBzjHZ2gD3butuue\nGmgV7Zbl8PrVSh5vhsM4NQhZ/iyeEaqS1na/8uFxAI074bohb01o+IMXCw7IRKHF\nnZo60BHHMqD8hemxr9y2FrLC2GClnCIfPsY40YmCpdHoMWXPaSDOpbisRBrziMKV\nfPQn5OepMib01M4U3lqkoULmckWXT1HCMlFCXP3HFwKBgQD5CgSTjUTAyTDyD5Hf\nNVsk0rkQOjQui4OdQyrVQHNujOzDfFzxnLYQ4QuUo0X9bELgdVj0DVSSYhvs9S90\nmQnscP78n10KkE9oRLSyOnCZstP5D7pa561tS7VSKSsonM0pIJYUH60WWX2I6YcO\nBY9jEukt56lms1nlflwH0iusnwKBgQDaHn5bVoXLnktBXUaT81/jRBMoYlBtk1wR\nhQlXMsx4+5N7EJTGZiXw/t3Bz3DS/GCDnvACLqd5q4h/rORsPMt2OAv5kLhiwkKz\nGKUw2j9st2CrUnRZafaB89SYz91WaFrUgy1tbE+hpfFF1Kv7kqtFzLtoSOu74gr4\nPjXl9Ip5RwKBgHcF3K4QhF2HSodF/beqLodo1t30k1/zedG9ekk1ZnXdkILVey5W\ncYWbqQc/CYJXLZdNPlhVzqevkB0uCaI2SlHgp11hZPxZgDobLClKWOp8V2bfp3cu\n5uonlt9PobrlRgBz/IZdpUHbP24h/lQrQB5fuWYhJAtbiIlwXNe4EPuNAoGBAM6J\ne2qv1keF34rIcTFdjhmcd2uRFMl9dPvd9odMQdP5nKA2hjoLtberDn8cF6ChfB6G\nHIxkcw9B/yGurClVs++AiM5LXF2fxxrhpmJI9y/RwMbZb/TO4q4RHemJQvQ0InYC\ntLxdiFXv1TQjeqrgKjAQ+hB4pEendm20MsNJuOm3AoGBAIiK+MyXZm1WA7cFGAP6\nm/LOLe5I5oApRlO2L2hjpKrzPMF7+Cpgg4zaNkGoNnRBjIcTatmV0kIsb1d9aYN0\nqZz+L2dpMMh4Ep+2SI7ac+h/cTZgNM+ycQAtKveIr+C5jkIq+xBlvpWo3sQ8O3Vu\nhfna1PRtESCgQYJvGD4AYDel\n-----END PRIVATE KEY-----\n",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1DAx/fiS4AfauEJtuVWR\nk0NWz/ZNSCp3vN2kb9CnXz1iXjfoxAIB85kGCTwBB6q6aIYxkubWPXGRxnpuQpQS\n+aBzwbPouJIYucE55Saz7x0r7X3w3FDc8Q4b2CTU51Uvfl+LQUCMa3axxNZQj9K4\nc46WQb2Oy9qUrkYGY8Y5g8rXLF3nG5oFOckDvBHMeSc/6gvYvrlMjXvNOw4eoYie\nZpAXtRW2buXuygFwt5gT+X/p+EL4rDuvP9oAjbX9S2ra0p5Y5W/Sw1i1a8Ux6Wnl\n8+xxRO+H0Fwzp+GT90m71Tn84BZqXar4ToMuBIBJmrOT5i66PQVGpMJSZHnPiGoH\nGQIDAQAB\n-----END PUBLIC KEY-----\n",
+      "installationToken": "048035fc84b6ae3c39ef438ed000f68a7e7871efd5010610a214ca4e4a993bbc",
+      "savedAt": 1777087148504
+    },
+    "session": {
+      "sessionToken": "31cac7d0012fff4b2e19f0aff55bc9b157f30aa8e7610671b815ecadb0b35d64",
+      "userId": 3629243,
+      "accountId": 3621234,
+      "savedAt": 1777087148504
+    },
+    "createdAt": "2026-04-25T03:19:08.504Z"
+  },
+  "Matteo": {
+    "name": "Matteo",
+    "apiKey": "sandbox_e10f44a2d1a9dfedc24049cb7ad5d0dc945cb5c1e4a93d2a57365c81",
+    "userId": 3629408,
+    "accountId": 3621547,
+    "email": "test+b8b93987-598b-4bd7-bbee-3ec8fac7343f@bunq.com",
+    "balance": "0.00",
+    "device": {
+      "privateKey": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDAvoob9QD992Lw\nJZM/PwWEXUybgpJua6RxoanzvgbTy8H0vivqT/TaH06FRQnDV02DSZUzhcTJ64zn\nVj+FrbtMuw4i5CaAPiFhhzMNrjj1kG/HLo278aSYef9LCRiLNZ5f7PLyJc2uh5jT\na/55wmc/namEgPcEqnl2Xw9LAhSAaRNdOudyJxn4RXg7sJYkONJxPDeCLPVDyWhu\nRK1QIdz3jC2C16SZrT82bxcO8J2RAV/xvWUk+A+CvM4OgD1xgNFGMVz2sbrG1vfY\n66TQjI6AKuOJhq++CEYmhZrhCOJEpqNxNUKh7dIt17ZF4pbeJ3ZrB6NvSmCkr+BD\n31t8DZohAgMBAAECggEAQhxY5NP5niLPhc1tnyDvtIIH98MmlMdJJUytLZR9ZQIb\nqeXczEbWlkZsuVt/yMfWJ3UCvyRf5l5r+yFjMmfvuZbjd2ZIKm6lJn2oLkYW9Wuw\nW2KFbPSqXz5hKYyaJY2joAV3I0WCMh4CdmoxY/QhU/mxHmjZ0Xjjpo1egnzZKV3I\nxlC5usiIb4sbCSE3emiB97uZXRxIdCUaSPGuQtgE1H2HzRczsdhPOwpAE/2AmWMx\nCyD26MZW1R4QLctQ9p7pbpTH9lr04rkpbzCcJ7Hp1GCldgOtem1rvzFxGjMWwg/E\nue8j2Z1ZJ3Q847tZrrwLMAnukVCoTxFKyuchpwvOrQKBgQDhvsYTYlx3nh5js87W\ntDfZn0NgVJGFqycssESEwI0E0c06xQkEhSoMOm0PUertibEATwF2G9eQviUmjTMo\naZCxrFOuJxagmyXsp3tY/S7hPrYH1A5Qi5IabF9qd8ePNx2AeD3pNVqQi+FgkK/F\nyEK+v/to0yIcsTAttE3FJYC42wKBgQDak4SOJHhLI4zrjXh9PbCiQ/x+wB+AN+rC\n4GHyx2GlUK/97d29fAWMzQCjthR/SZXiLWY2d3pPAtqgTD+ONFHtLc9w76pHvUTf\n9W7BPJUntkAkpOMZMP5fybcI7n9SygrAH+HFTy3yn0UmaX89V76LXcasTDJcHtj+\n30+qMovbswKBgQCtYZfCRZadbL0MeIqRTsNiirb14p4OGwEwioVlrHnizLyiubiO\nVzSPRcSDsrgMDuf6Q7Psob+z9MaV0HcNP98ZBzESHgV7/w1msM/E7lg2ObMXWiBQ\nbpIdZ0T1gd+suHkZNcDfP9I6GKVWRGosLv5MgSk4PokBnnlRcR0WIRK3ZwKBgHcv\naWB40n9mazkmc0UXlnFk0RHsgUDRPNn2sHJJ9hzG2rCEPB1Ou1gDkQ20A4lE/s3O\nI6YfkDn1PHGcIivQq7vA9xSGGzvzINNeaX5FIq/82Q0iPBNIe+yPeZcNNbBXK3WH\n7PxCKLPb1UEU1aUFa4ljISpigjNpPrn72tzboxexAoGBAIM92Qx0bxiBr7FJcnex\nX7KLgpz30sMpJKYJVgxf/5DWDDzg8R60S2x+paEzTMjiWEtog3Gg8oMN+sydij1m\nK0m/xEb360TUHfbFniXSOULYTwzNtCVbRjf/D9UonKBIQOCmtmCRkac5Lx4DDjxR\nlPWxRMCxXLwjksO1CrMFTFyd\n-----END PRIVATE KEY-----\n",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwL6KG/UA/fdi8CWTPz8F\nhF1Mm4KSbmukcaGp874G08vB9L4r6k/02h9OhUUJw1dNg0mVM4XEyeuM51Y/ha27\nTLsOIuQmgD4hYYczDa449ZBvxy6Nu/GkmHn/SwkYizWeX+zy8iXNroeY02v+ecJn\nP52phID3BKp5dl8PSwIUgGkTXTrncicZ+EV4O7CWJDjScTw3giz1Q8lobkStUCHc\n94wtgtekma0/Nm8XDvCdkQFf8b1lJPgPgrzODoA9cYDRRjFc9rG6xtb32Ouk0IyO\ngCrjiYavvghGJoWa4QjiRKajcTVCoe3SLde2ReKW3id2awejb0pgpK/gQ99bfA2a\nIQIDAQAB\n-----END PUBLIC KEY-----\n",
+      "installationToken": "cb29f0bbb4efe8bc8d7bd26b5aeb8f56d434296a3862749bcbc14283da119edd",
+      "savedAt": 1777092999963
+    },
+    "session": {
+      "sessionToken": "81bd120a3fc2583314370e2cf09f0fd1200b7b534d024592b2c7a359436b2758",
+      "userId": 3629408,
+      "accountId": 3621547,
+      "savedAt": 1777092999963
+    },
+    "createdAt": "2026-04-25T04:56:39.963Z"
+  }
+}

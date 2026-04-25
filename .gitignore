@@ -6,7 +6,6 @@ node_modules/
 .bunq-session*.json
 .bunq-device*.json
 .bunq-sugar*.json
-.bunq-accounts.json
 meditasplit.zip
 meditasplit_extracted/
 tsconfig.tsbuildinfo
