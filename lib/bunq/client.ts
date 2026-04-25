@@ -331,22 +331,47 @@ export async function getSandboxUserEmail(userId: number): Promise<string | null
   }
 }
 
-/** Resolve email aliases for all known sandbox members */
+/** Resolve email aliases — reads from bunq-members.json (shared) overriding with bunq-accounts.json (local) */
 export async function resolveMemberAliases(): Promise<{ name: string; userId: number; alias: string }[]> {
-  if (MOCK) return SANDBOX_USERS
-  const results = await Promise.all(
-    SANDBOX_USERS.map(async u => {
-      const email = await getSandboxUserEmail(u.userId)
-      return { ...u, alias: email ?? u.alias }
-    })
-  )
-  return results
+  const fs = await import('fs')
+  const path = await import('path')
+
+  // Load shared public registry (names + emails, committable)
+  const membersPath = path.join(process.cwd(), 'bunq-members.json')
+  let members: { name: string; userId: number; alias: string }[] = [...SANDBOX_USERS]
+  if (fs.existsSync(membersPath)) {
+    try {
+      const fromFile = JSON.parse(fs.readFileSync(membersPath, 'utf8')) as typeof members
+      // Merge: file entries override hardcoded ones
+      for (const entry of fromFile) {
+        const idx = members.findIndex(m => m.name.toLowerCase() === entry.name.toLowerCase())
+        if (idx >= 0) members[idx] = entry
+        else members.push(entry)
+      }
+    } catch { /* keep defaults */ }
+  }
+
+  // Also override with local .bunq-accounts.json (highest priority — own machine)
+  const accountsPath = path.join(process.cwd(), '.bunq-accounts.json')
+  if (fs.existsSync(accountsPath)) {
+    try {
+      const accounts = JSON.parse(fs.readFileSync(accountsPath, 'utf8')) as Record<string, { email: string; userId: number }>
+      for (const [name, acc] of Object.entries(accounts)) {
+        if (!acc.email) continue
+        const idx = members.findIndex(m => m.name.toLowerCase() === name.toLowerCase())
+        if (idx >= 0) members[idx] = { ...members[idx], userId: acc.userId, alias: acc.email }
+        else members.push({ name, userId: acc.userId, alias: acc.email })
+      }
+    } catch { /* keep defaults */ }
+  }
+
+  return members
 }
 
 export const SANDBOX_USERS = [
   { name: 'Francesco', userId: 3629040, alias: 'test+04f633e0-a0b9-462f-bb2f-d71d81d7d8ad@bunq.com' },
-  { name: 'Giorgio', userId: 3629030, alias: 'test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com' },
-  { name: 'Vaggelis', userId: 3629028, alias: 'test+a1223711-bee6-4974-bc54-b3ed8b11f121@bunq.com' },
+  { name: 'Giorgio',   userId: 3629030, alias: 'test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com' },
+  { name: 'Vaggelis',  userId: 3629028, alias: 'test+a1223711-bee6-4974-bc54-b3ed8b11f121@bunq.com' },
   { name: 'Diego',     userId: 3629045, alias: 'test+0e48be1e-7446-4b25-b0ac-6c16fbb0f38d@bunq.com' },
 ]
 

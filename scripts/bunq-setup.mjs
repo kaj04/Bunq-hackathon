@@ -125,8 +125,21 @@ accounts[name] = {
 }
 saveAccounts(accounts)
 
+// ─── Update bunq-members.json (public, committable — no private keys) ────────
+const MEMBERS_PATH = path.join(ROOT, 'bunq-members.json')
+let members = []
+if (fs.existsSync(MEMBERS_PATH)) {
+  try { members = JSON.parse(fs.readFileSync(MEMBERS_PATH, 'utf8')) } catch { members = [] }
+}
+const existingIdx = members.findIndex(m => m.name.toLowerCase() === name.toLowerCase())
+const memberEntry = { name, userId, alias: emailAlias }
+if (existingIdx >= 0) members[existingIdx] = memberEntry
+else members.push(memberEntry)
+fs.writeFileSync(MEMBERS_PATH, JSON.stringify(members, null, 2))
+
 console.log(`
 ✓ Account saved to .bunq-accounts.json
+✓ Email registered in bunq-members.json (commit this file to share with team)
 
   Name:       ${name}
   User ID:    ${userId}
