@@ -126,18 +126,61 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
             <table className="w-full text-sm text-left border-separate border-spacing-0">
               <tbody>
                 {transactions.length > 0 ? transactions.map((tx, idx) => {
-                  // For outgoing payments: description carries category+location+time — show it as primary
-                  // For incoming top-ups from Sugar Daddy: show "Sugar Daddy" as primary, description as subtitle
                   const isTopUp = tx.type === 'income' && tx.isSugarDaddy
-                  const primaryLabel = isTopUp ? tx.counterparty : (tx.description || tx.counterparty)
-                  const secondaryLabel = isTopUp ? tx.description : null
+
+                  // Parse enriched description: "[Category] Title — City, Country — HH:MM"
+                  let title = tx.description || tx.counterparty
+                  let location: string | null = null
+                  let time: string | null = null
+                  let categoryEmoji: string | null = null
+
+                  if (!isTopUp && tx.description) {
+                    // Extract category bracket
+                    const catMatch = tx.description.match(/^\[([^\]]+)\]\s*/)
+                    if (catMatch) {
+                      title = tx.description.slice(catMatch[0].length)
+                      const catMap: Record<string, string> = {
+                        'Food & Drink': '🍕', 'Transport': '🚗', 'Shopping': '🛍️',
+                        'Entertainment': '🎬', 'Home': '🏠', 'Health': '💊',
+                        'Travel': '✈️', 'Other': '📦',
+                      }
+                      categoryEmoji = catMap[catMatch[1]] ?? '📦'
+                    }
+                    // Extract time: last "— HH:MM"
+                    const timeMatch = title.match(/\s*—\s*(\d{2}:\d{2})\s*$/)
+                    if (timeMatch) {
+                      time = timeMatch[1]
+                      title = title.slice(0, title.length - timeMatch[0].length)
+                    }
+                    // Extract location: remaining "— City, Country"
+                    const locMatch = title.match(/\s*—\s*(.+)$/)
+                    if (locMatch) {
+                      location = locMatch[1]
+                      title = title.slice(0, title.length - locMatch[0].length).trim()
+                    }
+                  }
+
                   return (
                   <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
                     <td className="py-4 px-4">
-                      <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">{primaryLabel}</p>
-                      {secondaryLabel && <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{secondaryLabel}</p>}
+                      <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">
+                        {isTopUp ? tx.counterparty : title}
+                      </p>
+                      {isTopUp
+                        ? <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{tx.description}</p>
+                        : location && <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{location}</p>
+                      }
                     </td>
-                    <td className="py-4 px-4 text-zinc-500 text-xs italic opacity-60 font-medium">{tx.groupName || 'Direct'}</td>
+                    <td className="py-4 px-4 text-zinc-400 text-xs font-medium whitespace-nowrap">
+                      {isTopUp
+                        ? <span className="opacity-50 italic">Top-up</span>
+                        : <span className="flex items-center gap-1.5">
+                            {categoryEmoji && <span className="text-base leading-none">{categoryEmoji}</span>}
+                            {time && <span className="opacity-60">{time}</span>}
+                            {!categoryEmoji && !time && <span className="opacity-40 italic">{tx.groupName || 'Direct'}</span>}
+                          </span>
+                      }
+                    </td>
                     <td className={`py-4 px-4 text-right font-bold tabular-nums ${tx.type === 'income' ? 'text-bunq' : 'text-rose-500'}`}>
                       {tx.type === 'income' ? '+' : '-'} € {Math.abs(tx.amount).toFixed(2)}
                     </td>

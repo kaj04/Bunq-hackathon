@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
       ? { latitude: String(location.latitude), longitude: String(location.longitude), altitude: '0', radius: '500' }
       : undefined
 
-    const data = await makePayment(parseFloat(amount), enrichedDescription, geolocation)
+    const data = await makePayment(parseFloat(amount), enrichedDescription)
     return NextResponse.json({ success: true, data })
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 })

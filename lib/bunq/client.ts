@@ -170,7 +170,6 @@ export async function initBunq() {
 export async function makePayment(
   amount: number,
   description: string,
-  geolocation?: { latitude: string; longitude: string; altitude: string; radius: string }
 ) {
   if (MOCK) {
     MOCK_TRANSACTIONS.unshift({
@@ -190,7 +189,6 @@ export async function makePayment(
     amount: { value: amount.toFixed(2), currency: 'EUR' },
     counterparty_alias: { type: 'EMAIL', value: 'sugardaddy@bunq.com' },
     description,
-    ...(geolocation ? { geolocation } : {}),
   })
 }
 
