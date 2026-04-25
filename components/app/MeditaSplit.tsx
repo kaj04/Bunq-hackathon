@@ -28,8 +28,8 @@ export const MeditaSplit: React.FC = () => {
       const data = await res.json()
       if (data.success) {
         setGroups(data.data)
-        // Keep selectedGroup in sync
-        setSelectedGroup(prev => prev ? (data.data.find((g: Group) => g.id === prev.id) ?? prev) : null)
+        // Keep selectedGroup in sync; if the group was deleted, navigate back to the grid
+        setSelectedGroup(prev => prev ? (data.data.find((g: Group) => g.id === prev.id) ?? null) : null)
       }
     } catch { /* ignore */ }
   }, [])
@@ -151,12 +151,14 @@ export const MeditaSplit: React.FC = () => {
   }
 
   const handleUpdateGroup = async (updated: Group) => {
+    // Optimistic update so member add/remove feels instant
+    setSelectedGroup(updated)
+    setGroups(prev => prev.map(g => g.id === updated.id ? updated : g))
     await fetch(`/api/groups/${updated.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(updated),
     })
-    setSelectedGroup(updated)
     fetchGroups()
   }
 
