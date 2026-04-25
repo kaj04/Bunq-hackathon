@@ -1,223 +1,89 @@
 {
-  "1777100495901": [
-    {
-      "id": "1777100511301",
-      "sender": "user",
-      "senderName": "Francesco",
-      "text": "🎤 \"Split the last night dinner with Mateo\"",
-      "timestamp": "2026-04-25T07:01:51.301Z"
-    },
-    {
-      "id": "1777100511304",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "⏳ Analysing your request...",
-      "timestamp": "2026-04-25T07:01:51.304Z"
-    },
-    {
-      "id": "1777100512959",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "I didn't quite get that. Try: \"Split €60 for dinner between Giorgio and Diego\" or attach a photo of the receipt.",
-      "timestamp": "2026-04-25T07:01:52.959Z"
-    },
+  "1777111449337": [
     {
       "id": "1",
       "sender": "user",
       "senderName": "Diego",
-      "text": "split sushi of last week with matteo",
-      "timestamp": "2026-04-25T07:17:39.876Z"
-    },
-    {
-      "id": "2",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "⏳ Searching your payments...",
-      "timestamp": "2026-04-25T07:17:39.878Z"
+      "text": "🎤 \"Can you split the expenses that we made in Greece?\"",
+      "timestamp": "2026-04-25T10:08:32.619Z"
     },
     {
       "id": "3",
       "sender": "agent",
       "senderName": "AI",
-      "text": "\"Matteo\" doesn't match any authorized group member. The available members are: Francesco, Giorgio, Vaggelis, and Diego. Could you clarify who you meant?",
-      "timestamp": "2026-04-25T07:17:44.530Z"
+      "text": "I need a bit more info to split the Greece expenses! Could you tell me:\n\n1. **Who was there?** (e.g. everyone, or specific people)\n2. **What expenses?** (e.g. a specific payment, a total amount, or a receipt)\n3. **How to split?** (equally, or specific amounts per person?)",
+      "timestamp": "2026-04-25T10:08:38.308Z",
+      "widgets": [
+        {
+          "label": "🌍 Split equally among everyone",
+          "value": "Split all Greece expenses equally among everyone"
+        },
+        {
+          "label": "📋 I have a list of expenses",
+          "value": "Here are the Greece expenses to split:"
+        },
+        {
+          "label": "🧾 Split a specific amount",
+          "value": "Split €___ for Greece expenses equally among everyone"
+        },
+        {
+          "label": "📅 Search recent Greece payments",
+          "value": "Search for all Greece-related payments from the last 30 days and split them"
+        }
+      ]
     },
     {
       "id": "4",
       "sender": "user",
       "senderName": "Diego",
-      "text": "wait, remove vaggelis",
-      "timestamp": "2026-04-25T07:26:27.346Z"
+      "text": "Search for all Greece-related payments from the last 30 days and split them",
+      "timestamp": "2026-04-25T10:09:58.029Z"
     },
     {
       "id": "6",
       "sender": "agent",
       "senderName": "AI",
-      "text": "Here's the split for \"Taxi Uber shared airport ride — split for Diego, Francesco\":\n• Francesco: €11.33\n• Diego: €11.33\n\nTotal: €22.66\n\n✅ Confirm and I'll send the payment requests via Bunq.",
-      "timestamp": "2026-04-25T07:26:34.171Z"
+      "text": "I found 2 Greece-related payments totalling €91.25. How would you like to split them?",
+      "timestamp": "2026-04-25T10:10:17.363Z",
+      "widgets": [
+        {
+          "label": "🍽️+🥂 Split both (€91.25) equally among all 4",
+          "value": "Split the Greece expenses (Salle Avant €66 + Aperitifs €25.25) equally among Vaggelis, Francesco, Diego and Giorgio"
+        },
+        {
+          "label": "🍽️ Split only Salle Avant (€66.00) equally among all 4",
+          "value": "Split the Salle Avant dinner for €66 equally among Vaggelis, Francesco, Diego and Giorgio"
+        },
+        {
+          "label": "🥂 Split only Aperitifs (€25.25) equally among all 4",
+          "value": "Split the Aperitifs for €25.25 equally among Vaggelis, Francesco, Diego and Giorgio"
+        },
+        {
+          "label": "✏️ Split differently (custom amounts or people)",
+          "value": "Split the Greece expenses differently — let me specify how"
+        }
+      ]
     },
     {
       "id": "7",
       "sender": "user",
-      "senderName": "Francesco",
-      "text": "🎤 \"No I pay only the Glocky\"",
-      "timestamp": "2026-04-25T07:47:02.339Z"
+      "senderName": "Diego",
+      "text": "Split the Greece expenses (Salle Avant €66 + Aperitifs €25.25) equally among Vaggelis, Francesco, Diego and Giorgio",
+      "timestamp": "2026-04-25T10:10:30.576Z"
     },
     {
       "id": "9",
       "sender": "agent",
       "senderName": "AI",
-      "text": "I couldn't find a payment called \"Glocky\" and it doesn't match any group member. Could you help me clarify?",
-      "timestamp": "2026-04-25T07:47:10.125Z",
-      "widgets": [
-        {
-          "label": "💰 Enter amount manually",
-          "value": "I pay only the Glocky, the total was €"
-        },
-        {
-          "label": "📅 Search further back (2 weeks)",
-          "value": "I pay only the Glocky, search in the last 14 days"
-        },
-        {
-          "label": "🔤 It's a nickname for a place — let me rephrase",
-          "value": "Split the Glocky expense — it was at"
-        }
-      ]
-    },
-    {
-      "id": "10",
-      "sender": "user",
-      "senderName": "Francesco",
-      "text": "I pay only the Glocky, the total was €",
-      "timestamp": "2026-04-25T07:47:29.069Z"
-    },
-    {
-      "id": "12",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "I couldn't find a payment called \"Glocky\" and the total amount seems to be missing. Could you clarify?",
-      "timestamp": "2026-04-25T07:47:37.416Z",
-      "widgets": [
-        {
-          "label": "🔍 Search further back (30 days)",
-          "value": "I pay only the Glocky, search the last 30 days"
-        },
-        {
-          "label": "💬 Enter amount manually",
-          "value": "I pay only the Glocky, the total was €[amount]"
-        },
-        {
-          "label": "📋 Use previous split total (€54.50)",
-          "value": "I pay only the Glocky, the total was €54.50"
-        }
-      ]
-    },
-    {
-      "id": "13",
-      "sender": "user",
-      "senderName": "Francesco",
-      "text": "gloky was in the receipt I sent you",
-      "timestamp": "2026-04-25T07:48:27.219Z"
-    },
-    {
-      "id": "15",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "I couldn't find a receipt or a payment called 'Gloky/Glocky'. Could you clarify?",
-      "timestamp": "2026-04-25T07:48:35.961Z",
-      "widgets": [
-        {
-          "label": "📷 It's a place name — tell me the amount",
-          "value": "Gloky total was €___ split between Francesco, Diego and Giorgio"
-        },
-        {
-          "label": "🔍 Search by a different name",
-          "value": "Search for the payment called ___ from ___ days ago"
-        },
-        {
-          "label": "✏️ Enter amount manually",
-          "value": "Split €___ for Gloky between ___"
-        }
-      ]
-    }
-  ],
-  "1777101581166": [
-    {
-      "id": "1",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "divide taxi with all, I paid for everyone",
-      "timestamp": "2026-04-25T07:20:02.606Z"
-    },
-    {
-      "id": "3",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "Here's the split for \"Taxi Uber shared airport ride — paid by Diego for all 3\":\n• Vaggelis: €11.33\n• Giorgio: €11.33\n• Diego: €11.34\n\nTotal: €34.00\n\n✅ Confirm and I'll send the payment requests via Bunq.",
-      "timestamp": "2026-04-25T07:20:10.650Z"
-    },
-    {
-      "id": "4",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "✅ Done! Payment requests sent to Vaggelis, Giorgio via Bunq.\n\nThey'll receive a notification to accept.\n\n🔖 Batch ID: 1777101613767",
-      "timestamp": "2026-04-25T07:20:13.772Z"
-    },
-    {
-      "id": "5",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "now divide yesterday dinner between al",
-      "timestamp": "2026-04-25T07:20:33.128Z"
-    },
-    {
-      "id": "7",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "I couldn't determine who to split with. Please name group members or provide an amount.",
-      "timestamp": "2026-04-25T07:20:39.963Z"
-    },
-    {
-      "id": "8",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "all of us",
-      "timestamp": "2026-04-25T07:20:52.857Z"
+      "text": "Here's the split for \"Greece expenses (Salle Avant + Aperitifs)\":\n• Vaggelis: €22.82\n• Francesco: €22.81\n• Diego: €22.81\n• Giorgio: €22.81\n\nTotal: €91.25\n\n✅ Confirm to send payment requests via Bunq.",
+      "timestamp": "2026-04-25T10:10:37.772Z"
     },
     {
       "id": "10",
       "sender": "agent",
       "senderName": "AI",
-      "text": "Got it — you want to split among all of you (Vaggelis, Diego, Giorgio)! But I'm missing a couple of details:\n\n1. **What expense** are you splitting? (e.g. dinner, taxi, drinks)\n2. **What's the amount?** Or was it a recent payment I should look up?",
-      "timestamp": "2026-04-25T07:20:56.418Z"
-    },
-    {
-      "id": "11",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "yesterda",
-      "timestamp": "2026-04-25T07:21:12.809Z"
-    },
-    {
-      "id": "13",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "Here's the split for \"Pizza dinner da Mario — paid by Diego for all 3\":\n• Vaggelis: €32.00\n• Giorgio: €32.00\n\nTotal: €64.00\n\n✅ Confirm and I'll send the payment requests via Bunq.",
-      "timestamp": "2026-04-25T07:21:20.872Z"
-    },
-    {
-      "id": "14",
-      "sender": "user",
-      "senderName": "Diego",
-      "text": "remove vaggelis",
-      "timestamp": "2026-04-25T07:21:34.084Z"
-    },
-    {
-      "id": "16",
-      "sender": "agent",
-      "senderName": "AI",
-      "text": "I couldn't determine who to split with. Please name group members or provide an amount.",
-      "timestamp": "2026-04-25T07:21:36.651Z"
+      "text": "✅ Done! Payment requests sent to Vaggelis, Francesco, Giorgio via Bunq.\n\nThey'll receive a notification to accept.\n\n🔖 Batch ID: 7053",
+      "timestamp": "2026-04-25T10:10:40.877Z"
     }
   ]
 }

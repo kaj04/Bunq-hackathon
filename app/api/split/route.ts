@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import Fuse from 'fuse.js'
 import type { ApiResponse, SplitResult } from '@/types'
-import { SPLIT_PROMPT_WITH_RECEIPT, splitAgentSystemPrompt, type HistoryEntry } from '@/lib/claude/prompts'
+import { SPLIT_PROMPT_RECEIPTS, splitAgentSystemPrompt, type HistoryEntry } from '@/lib/claude/prompts'
 import { searchRecentPayments } from '@/lib/bunq/payments'
 
 type Member = { name: string; alias: string }
@@ -150,7 +150,7 @@ async function runToolUseLoop(
 export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<SplitResult[]>>> {
   try {
     const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY })
-    const { receipt, members: rawMembers, participants: rawParticipants, voiceInput, speaker, history } = await req.json()
+    const { receipt, receiptName, receipts: multiReceipts, members: rawMembers, participants: rawParticipants, voiceInput, speaker, history } = await req.json()
     const typedHistory: HistoryEntry[] = Array.isArray(history) ? history : []
 
     // Accept both `members` (new, with aliases) and `participants` (legacy, names only)
@@ -161,21 +161,23 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
           alias: '',
         }))
 
-    const participantNames = members.map(m => m.name).filter(Boolean)
+    // ── Receipt path: direct call (no tools needed — amounts & members are known) ──
+    const allReceipts: { name: string; items: any[]; total: number }[] = []
+    if (receipt) allReceipts.push({ name: receiptName ?? 'Receipt', items: receipt.items ?? [], total: receipt.total ?? 0 })
+    if (Array.isArray(multiReceipts)) multiReceipts.forEach(r => allReceipts.push(r))
 
     let finalText: string
 
-    // ── Receipt path: no tool use needed ─────────────────────────────────────
-    if (receipt) {
-      const prompt = SPLIT_PROMPT_WITH_RECEIPT(JSON.stringify(receipt), participantNames, voiceInput ?? '', speaker)
+    if (allReceipts.length > 0) {
+      const prompt = SPLIT_PROMPT_RECEIPTS(allReceipts, members, voiceInput ?? '', speaker)
       const response = await client.messages.create({
         model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
+        max_tokens: 2048,
         messages: [{ role: 'user', content: prompt }],
       })
       finalText = response.content.find(b => b.type === 'text')?.text ?? ''
     } else {
-      // ── Agentic voice/text path ─────────────────────────────────────────────
+      // ── Voice-only path: agentic loop with search_payments + match_contact ──
       const userMessage = [
         `Authorized group members (ONLY these people can be included in a split):`,
         members.map(m => `  - ${m.name} (alias: ${m.alias || 'unknown'})`).join('\n'),

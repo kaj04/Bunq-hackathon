@@ -22,6 +22,22 @@ type PendingSplit = {
   total: number
 }
 
+type MatchedPayment = { id: number; amount: number; description: string; date: string; counterparty: string }
+type NamedReceipt = { id: string; name: string; items: any[]; total: number; matchedPayment: MatchedPayment }
+
+function guessReceiptName(items: any[], index: number): string {
+  const text = items.map((i: any) => (i.name ?? '').toLowerCase()).join(' ')
+  if (/pizza|pasta|risotto|tiramisu|carbonara|gnocchi|focaccia/.test(text)) return '🍕 Italian Dinner'
+  if (/sushi|ramen|miso|gyoza|tempura|udon/.test(text)) return '🍱 Japanese'
+  if (/burger|fries|wings|nugget|hotdog/.test(text)) return '🍔 Burgers'
+  if (/coffee|espresso|cappuccino|latte|americano|macchiato/.test(text)) return '☕ Café'
+  if (/beer|wine|cocktail|gin|whiskey|vodka|prosecco|cocktail/.test(text)) return '🍷 Drinks'
+  if (/pancake|waffle|eggs|bacon|toast|croissant/.test(text)) return '🥞 Breakfast'
+  if (/salmon|shrimp|seafood|fish|tuna/.test(text)) return '🐟 Seafood'
+  if (/salad|hummus|falafel|wrap|pita/.test(text)) return '🥗 Light Bites'
+  return `🧾 Receipt ${index + 1}`
+}
+
 const WELCOME = (groupName: string): ChatMessage => ({
   id: 'welcome',
   sender: 'agent',
@@ -48,11 +64,13 @@ export const GroupChat: React.FC<GroupChatProps> = ({
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [pendingSplit, setPendingSplit] = useState<PendingSplit | null>(null)
-  const [pendingReceipt, setPendingReceipt] = useState<{ items: any[]; total: number } | null>(null)
+  const [namedReceipts, setNamedReceipts] = useState<NamedReceipt[]>([])
+  const [activeReceiptId, setActiveReceiptId] = useState<string | null>(null)
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
+  const voiceTranscriptRef = useRef<string>('')
   const msgIdRef = useRef(0)
   const knownIdsRef = useRef<Set<string>>(new Set(['welcome']))
 
@@ -129,6 +147,12 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     setPendingSplit(null)
     addMessage('agent', '⏳ Thinking...', false)
     try {
+      const receiptPayload =
+        namedReceipts.length === 1
+          ? { receipt: { items: namedReceipts[0].items, total: namedReceipts[0].total }, receiptName: namedReceipts[0].name }
+          : namedReceipts.length > 1
+            ? { receipts: namedReceipts.map(r => ({ name: r.name, items: r.items, total: r.total })) }
+            : {}
       const res = await fetch('/api/split', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -137,7 +161,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({
           voiceInput: text,
           speaker: currentUser,
           history,
-          ...(pendingReceipt ? { receipt: pendingReceipt } : {}),
+          ...receiptPayload,
         }),
       })
       const data = await res.json()
@@ -145,9 +169,18 @@ export const GroupChat: React.FC<GroupChatProps> = ({
 
       if (data.success && data.data?.length > 0) {
         const splits = data.data
-        const total = splits.reduce((s: number, x: any) => s + x.amount, 0)
+        const othersTotal = splits.reduce((s: number, x: any) => s + x.amount, 0)
         const description: string = data.description ?? text
         const splitText = splits.map((s: any) => `• ${s.participant.name}: €${s.amount.toFixed(2)}`).join('\n')
+
+        // If receipts are loaded, show the full receipt total and the payer's implicit share
+        const receiptTotal = namedReceipts.length > 0
+          ? namedReceipts.reduce((s, r) => s + r.total, 0)
+          : null
+        const payerShare = receiptTotal !== null ? receiptTotal - othersTotal : null
+        const totalLine = receiptTotal !== null
+          ? `Receipt total: €${receiptTotal.toFixed(2)}${payerShare !== null && payerShare > 0.005 ? ` · Your share: €${payerShare.toFixed(2)}` : ''} · Others owe: €${othersTotal.toFixed(2)}`
+          : `Total: €${othersTotal.toFixed(2)}`
 
         setPendingSplit({
           splits: splits.map((s: any) => ({
@@ -156,16 +189,15 @@ export const GroupChat: React.FC<GroupChatProps> = ({
             amount: s.amount,
           })),
           description,
-          total,
+          total: othersTotal,
         })
 
         setMessages(prev => prev.slice(0, -1))
-        addMessage('agent', `Here's the split for "${description}":\n${splitText}\n\nTotal: €${total.toFixed(2)}\n\n✅ Confirm to send payment requests via Bunq.`, true, widgets)
+        addMessage('agent', `Here's the split for "${description}":\n${splitText}\n\n${totalLine}\n\n✅ Confirm to send payment requests via Bunq.`, true, widgets)
         setHistory(prev => [...prev, { userText: text, agentSummary: data.agentSummary ?? description }])
-        setPendingReceipt(null)
       } else {
         setMessages(prev => prev.slice(0, -1))
-        const responseText = data.error ?? (pendingReceipt
+        const responseText = data.error ?? (namedReceipts.length > 0
           ? 'Could not assign items. Try: "Francesco gets the burger, Diego gets the pasta"'
           : "I didn't quite get that. Try: \"Split €60 for dinner between Giorgio and Diego\" or attach a photo of the receipt.")
         addMessage('agent', responseText, true, widgets)
@@ -220,6 +252,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     } catch {
       addMessage('agent', '⚠️ Network error. Please try again.')
     }
+    setNamedReceipts([])
+    setActiveReceiptId(null)
     setPendingSplit(null)
     setIsSending(false)
   }
@@ -229,21 +263,31 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     if (!SR) { alert('Voice recognition requires Chrome'); return }
     const r = new SR()
     r.lang = 'en-US'
-    r.continuous = false
+    r.continuous = true
     r.interimResults = false
+    voiceTranscriptRef.current = ''
     r.onresult = (e: any) => {
-      const transcript = e.results[0][0].transcript
-      addMessage('user', `🎤 "${transcript}"`)
-      processText(transcript)
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) {
+          voiceTranscriptRef.current += (voiceTranscriptRef.current ? ' ' : '') + e.results[i][0].transcript
+        }
+      }
     }
     r.onerror = () => { setIsRecording(false); addMessage('agent', '⚠️ No audio detected. Please try again.') }
-    r.onend = () => setIsRecording(false)
+    r.onend = () => {
+      setIsRecording(false)
+      const transcript = voiceTranscriptRef.current.trim()
+      if (transcript) {
+        addMessage('user', `🎤 "${transcript}"`)
+        processText(transcript)
+      }
+    }
     recognitionRef.current = r
     r.start()
     setIsRecording(true)
   }, [group])
 
-  const stopVoice = () => { recognitionRef.current?.stop(); setIsRecording(false) }
+  const stopVoice = () => { recognitionRef.current?.stop() }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -263,8 +307,34 @@ export const GroupChat: React.FC<GroupChatProps> = ({
         const data = await res.json()
         if (data.success) {
           const { items, total } = data.data
-          setPendingReceipt({ items, total })
-          const itemList = items.map((i: any) => `• ${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}: €${i.price.toFixed(2)}`).join('\n')
+          const name = guessReceiptName(items, namedReceipts.length)
+
+          // Verify the receipt total exists as an outgoing Bunq payment
+          const matchRes = await fetch('/api/bunq/match-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: total }),
+          })
+          const matchData = await matchRes.json()
+
+          if (!matchData.success || matchData.data.length === 0) {
+            setMessages(prev => prev.slice(0, -1))
+            addMessage('agent', `⚠️ No matching payment found for €${total.toFixed(2)} in your Bunq account.\n\nYou can only request money for expenses you actually paid. Please check that this receipt corresponds to a real payment.`)
+            setIsProcessing(false)
+            return
+          }
+
+          // Use most recent match (already sorted)
+          const matchedPayment: MatchedPayment = matchData.data[0]
+          const newId = Date.now().toString()
+          setNamedReceipts(prev => [...prev, { id: newId, name, items, total, matchedPayment }])
+          setActiveReceiptId(newId)
+
+          const itemList = items.map((i: any) => {
+            const lineTotal = i.price * (i.quantity || 1)
+            const qty = i.quantity > 1 ? ` ×${i.quantity} (€${i.price.toFixed(2)} each)` : ''
+            return `• ${i.name}${qty}: €${lineTotal.toFixed(2)}`
+          }).join('\n')
           const memberNames = group.members.map(m => m.name)
           const receiptWidgets: Widget[] = [
             { label: `✂️ Split equally among all (${memberNames.join(', ')})`, value: `Split the receipt equally among ${memberNames.join(', ')}` },
@@ -273,8 +343,11 @@ export const GroupChat: React.FC<GroupChatProps> = ({
               ? [{ label: '👥 Split between some members', value: 'Who should split this receipt?' }]
               : [])
           ]
+          const multiMatchNote = matchData.data.length > 1
+            ? `\n\n⚠️ ${matchData.data.length} payments match this amount — using the most recent one.`
+            : ''
           setMessages(prev => prev.slice(0, -1))
-          addMessage('agent', `Receipt scanned! 🧾\n\n${itemList}\n\nTotal: €${total.toFixed(2)}\n\nHow should I split this?`, true, receiptWidgets)
+          addMessage('agent', `${name} scanned! 🧾\n\n${itemList}\n\nTotal: €${total.toFixed(2)}\n✅ Verified: "${matchedPayment.description}" paid to ${matchedPayment.counterparty} on ${matchedPayment.date}${multiMatchNote}\n\nHow should I split this?`, true, receiptWidgets)
         }
       } catch {
         setMessages(prev => prev.slice(0, -1))
@@ -494,12 +567,33 @@ export const GroupChat: React.FC<GroupChatProps> = ({
 
       {/* Input area */}
       <div className="p-6 pt-2 space-y-3">
-        {pendingReceipt && (
-          <div className="flex items-center justify-between bg-bunq/10 border border-bunq/30 rounded-2xl px-4 py-2.5">
-            <span className="text-xs text-bunq font-semibold">🧾 Receipt loaded — tell me who gets what</span>
-            <button onClick={() => setPendingReceipt(null)} className="text-zinc-500 hover:text-white transition-colors ml-3">
-              <X size={14} />
-            </button>
+        {namedReceipts.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {namedReceipts.map(r => (
+              <div
+                key={r.id}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-all ${
+                  activeReceiptId === r.id
+                    ? 'bg-bunq/20 border-bunq text-bunq'
+                    : 'bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                }`}
+                onClick={() => setActiveReceiptId(r.id)}
+              >
+                <span>{r.name}</span>
+                <span className="opacity-60">€{r.total.toFixed(2)}</span>
+                <span className="opacity-40 font-normal truncate max-w-[80px]">{r.matchedPayment.counterparty}</span>
+                <button
+                  onClick={e => {
+                    e.stopPropagation()
+                    setNamedReceipts(prev => prev.filter(x => x.id !== r.id))
+                    if (activeReceiptId === r.id) setActiveReceiptId(null)
+                  }}
+                  className="ml-1 opacity-50 hover:opacity-100 transition-opacity"
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 

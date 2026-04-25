@@ -7,18 +7,23 @@ Analyze this receipt image. Return ONLY valid JSON, no extra text:
   "total": number,
   "currency": "EUR"
 }
-If a value is unclear, use the most likely estimate.
+Rules:
+- "price" is the UNIT price (price for one item), NOT the line total.
+- "quantity" is the number of units ordered.
+- "total" is the grand total of the entire receipt.
+- If a value is unclear, use the most likely estimate.
 `
 
 export const SPLIT_PROMPT_WITH_RECEIPT = (
   receipt: string,
   participants: string[],
   voiceInput: string,
-  speaker?: string
+  speaker?: string,
+  receiptName?: string
 ) => `
 You are a bill-splitting assistant. Split the receipt based on who ordered what.
 
-Receipt JSON:
+Receipt${receiptName ? ` (${receiptName})` : ''} JSON:
 ${receipt}
 
 People at the table: ${participants.join(', ')}
@@ -40,8 +45,98 @@ The sum of all amounts MUST equal the receipt total exactly. Adjust the largest 
 
 Return ONLY valid JSON, no explanation:
 {
+  "description": "short label for this split${receiptName ? ` (default: '${receiptName}')` : ''}",
   "splits": [
     { "participant": "name", "amount": number, "items": ["item: €price"] }
+  ]
+}
+`
+
+// Unified receipt prompt — handles 1 or more receipts, used for all receipt-based splits.
+export const SPLIT_PROMPT_RECEIPTS = (
+  receipts: { name: string; items: any[]; total: number }[],
+  members: { name: string; alias: string }[],
+  voiceInput: string,
+  speaker?: string
+) => {
+  const receiptBlocks = receipts.map(r => {
+    const lines = r.items.map((i: any) => {
+      const lineTotal = i.price * (i.quantity || 1)
+      const qty = i.quantity > 1 ? ` ×${i.quantity} @ €${i.price.toFixed(2)} each` : ''
+      return `  • ${i.name}${qty}: €${lineTotal.toFixed(2)}`
+    })
+    return `[${r.name}] — total €${r.total.toFixed(2)}\n${lines.join('\n')}`
+  }).join('\n\n')
+
+  return `You are a bill-splitting assistant. The payer covered all receipts below and wants you to split them.
+
+${receiptBlocks}
+
+Group members (only these names are valid — match names case-insensitively):
+${members.map(m => `  - ${m.name} (alias: ${m.alias || 'unknown'})`).join('\n')}
+${speaker ? `\nPayer: ${speaker}. "I" / "me" / "my" always refers to "${speaker}". Do NOT include ${speaker} in the output splits — they already paid.` : ''}
+
+User said: "${voiceInput}"
+
+CRITICAL — prices:
+- Each item line shows: [name] ×[qty] @ €[unit_price] each: €[line_total]
+- Unit price is the cost for ONE unit. If someone had 1 unit, they owe the unit price.
+- Do NOT divide the unit price again. €4.50 per latte means one latte costs €4.50.
+
+Assignment rules:
+1. Match receipts by name: "café receipt" / "first receipt" → [${receipts.map(r => r.name).join('] or [')}].
+2. Match person names case-insensitively from the group members list.
+3. "I had 1 X" → 1 unit of X at unit_price goes to the payer (excluded from output).
+4. "the other X" → the next unassigned unit of item X at unit_price.
+5. "half of X with Y" → split item X's line total 50/50 between payer and Y.
+6. "X got the rest" / "everything else" → all items/units from that receipt not yet assigned.
+7. Shared item → divide line total equally among those sharing.
+8. Unknown item reference → ignore it and continue with what is clear.
+9. Split amounts must sum exactly to the referenced receipt total(s). Adjust the largest share for rounding.
+10. Omit anyone whose share rounds to €0.
+
+IMPORTANT: Never return a question or clarification. Always return valid JSON even if some references are ambiguous — make your best guess for anything unclear.
+
+Return ONLY this JSON, no other text:
+{
+  "description": "short combined label",
+  "total": combined_receipt_total,
+  "splits": [
+    { "participant": "exact name from group members list", "alias": "their alias", "amount": number, "items": ["[Receipt] item: €amount"] }
+  ]
+}`
+}
+
+export const SPLIT_PROMPT_WITH_MULTI_RECEIPT = (
+  receipts: { name: string; items: any[]; total: number }[],
+  participants: string[],
+  voiceInput: string,
+  speaker?: string
+) => `
+You are a bill-splitting assistant. The user paid for multiple receipts and wants to split them in one go.
+
+${receipts.map(r => `[${r.name}] — total €${r.total.toFixed(2)}\n${JSON.stringify(r.items)}`).join('\n\n')}
+
+People at the table: ${participants.join(', ')}
+${speaker ? `The person who paid for everything is: ${speaker}. "I"/"me"/"my" always means "${speaker}". Do NOT include ${speaker} in the output splits — they already paid.` : ''}
+
+Voice description: "${voiceInput}"
+
+Rules:
+1. Match receipt references by name: "café receipt" → [${receipts.map(r => r.name).join('], [')}], "first receipt" → first listed, etc.
+2. Assign items per receipt as described. Apply QUANTITY MATH: unit price = item_total ÷ quantity; assign the stated number of units to each person.
+3. "X got the rest" = all remaining units of that item not claimed by others.
+4. Shared items are split equally among those sharing.
+5. Sum each person's amounts across ALL receipts they owe for.
+6. Omit anyone who owes €0 (including the payer).
+7. The combined total of all splits must equal the sum of all receipts referenced.
+
+Return ONLY valid JSON, no explanation:
+{
+  "description": "brief combined label (e.g. '${receipts.map(r => r.name).join(' + ')}' split)",
+  "total": combined_total_number,
+  "splits": [
+    { "participant": "name", "amount": number, "items": ["${receipts[0]?.name ?? 'Receipt'}: item €price", ...] }
   ]
 }
 `
@@ -63,6 +158,20 @@ export function splitAgentSystemPrompt(history?: HistoryEntry[]): string {
 Today's date: ${new Date().toISOString().split('T')[0]}${historySection}
 
 Your job is to understand what expense the user wants to split and among whom, then return the proposed split.
+
+## Receipt-based splits (when "Receipt items" are provided in the user message)
+- DO NOT call search_payments — the receipt already contains the amounts.
+- DO call match_contact for every person named by the user (including "I"/"me" → current user).
+- Assign receipt items to people exactly as described:
+  - "I had X" → assign item X to the current user
+  - "half of X with Y" → split item X equally between the current user and Y
+  - "the other X" → the next unassigned unit of item X
+  - "the rest" / "everything else" → all receipt items/units not yet assigned to anyone
+  - Shared items → divide cost equally among those sharing
+- Unit price: if an item has quantity > 1, unit price = total_price ÷ quantity. Assign (units × unit_price) per person.
+- The sum of all split amounts MUST equal the receipt total exactly. Adjust the largest share for rounding.
+- Omit anyone whose share is €0 (and always omit the payer from split_among).
+- Use the receipt name (if provided) as the split description.
 
 ## Contact matching (match_contact tool)
 - Call match_contact for EVERY person named by the user, even if the name looks obvious. This resolves nicknames, partial names, and typos, and returns the Bunq alias needed for payment requests.
