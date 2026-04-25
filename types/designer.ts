@@ -1,6 +1,7 @@
 export interface ChatMessage {
   id: string
   sender: 'user' | 'agent'
+  senderName?: string
   text: string
   timestamp: string
   attachment?: { type: 'receipt'; url: string }

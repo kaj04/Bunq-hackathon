@@ -172,7 +172,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
                   }
 
                   return (
-                  <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
+                  <tr key={`tx-${tx.id ?? idx}`} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
                     <td className="py-4 px-4">
                       <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">
                         {isTopUp ? tx.counterparty : title}
@@ -214,8 +214,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
             <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.2em]">{requests.length} Pending</span>
           </div>
           <div className="space-y-3">
-            {requests.length > 0 ? requests.map((req) => (
-              <div key={req.id} className="bg-card p-5 rounded-[20px] flex items-center justify-between border border-zinc-800 hover:border-zinc-700 transition-all shadow-sm group">
+            {requests.length > 0 ? requests.map((req, idx) => (
+              <div key={`req-${req.id ?? idx}`} className="bg-card p-5 rounded-[20px] flex items-center justify-between border border-zinc-800 hover:border-zinc-700 transition-all shadow-sm group">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center font-bold text-sm text-zinc-400 group-hover:text-bunq transition-colors">
                     {req.from.charAt(0)}

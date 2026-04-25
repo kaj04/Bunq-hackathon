@@ -1,6 +1,6 @@
 'use client'
-import React, { useState, useEffect } from 'react'
-import { Plus, Users, ArrowRight, Check } from 'lucide-react'
+import React, { useState } from 'react'
+import { Plus, Users, ArrowRight, Check, UserPlus } from 'lucide-react'
 import { Group } from '@/types/designer'
 
 interface GroupMember { name: string; alias: string }
@@ -18,11 +18,9 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
   const [newEmoji, setNewEmoji] = useState('🌍')
   const [newColor, setNewColor] = useState('#00a86b')
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set())
-
-  // Pre-select all contacts whenever the list loads or creation opens
-  useEffect(() => {
-    if (isCreating) setSelectedNames(new Set(availableContacts.map(c => c.name)))
-  }, [isCreating, availableContacts])
+  const [manualMembers, setManualMembers] = useState<GroupMember[]>([])
+  const [manualName, setManualName] = useState('')
+  const [manualEmail, setManualEmail] = useState('')
 
   const toggleMember = (name: string) => {
     setSelectedNames(prev => {
@@ -32,19 +30,32 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
     })
   }
 
+  const addManualMember = () => {
+    const email = manualEmail.trim()
+    const name = manualName.trim() || email.split('@')[0]
+    if (!email.includes('@')) return
+    if (manualMembers.some(m => m.alias === email) || availableContacts.some(c => c.alias === email)) return
+    setManualMembers(prev => [...prev, { name, alias: email }])
+    setManualName('')
+    setManualEmail('')
+  }
+
   const handleCreate = () => {
     if (!newName.trim()) return
-    const members = availableContacts.filter(c => selectedNames.has(c.name))
+    const fromContacts = availableContacts.filter(c => selectedNames.has(c.name))
+    const members = [...fromContacts, ...manualMembers]
     onCreateGroup(newName.trim(), newEmoji, newColor, members)
     setNewName('')
     setNewEmoji('🌍')
     setNewColor('#00a86b')
+    setManualMembers([])
     setIsCreating(false)
   }
 
   const handleCancel = () => {
     setIsCreating(false)
     setNewName('')
+    setManualMembers([])
   }
 
   return (
@@ -54,7 +65,14 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
           <h2 className="text-3xl font-bold tracking-tight">Your Groups</h2>
           <p className="text-white/40">Manage your shared expenses with friends</p>
         </div>
-        <button onClick={() => setIsCreating(true)} className="btn-primary">
+        <button
+          onClick={() => {
+            setSelectedNames(new Set(availableContacts.map(c => c.name)))
+            setManualMembers([])
+            setIsCreating(true)
+          }}
+          className="btn-primary"
+        >
           <Plus size={20} /> New Group
         </button>
       </div>
@@ -89,7 +107,7 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
               ))}
             </div>
 
-            {/* Member picker */}
+            {/* Member picker — contacts */}
             {availableContacts.length > 0 && (
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Members</p>
@@ -119,6 +137,40 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
                 </p>
               </div>
             )}
+
+            {/* Manual member add */}
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-2">Add by Email</p>
+              <div className="flex gap-2">
+                <input
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                  placeholder="Name (optional)"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-xl p-2 text-xs focus:outline-none focus:ring-1 focus:ring-bunq"
+                />
+                <input
+                  value={manualEmail}
+                  onChange={e => setManualEmail(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addManualMember()}
+                  placeholder="email@bunq.com"
+                  className="flex-[2] bg-white/5 border border-white/10 rounded-xl p-2 text-xs focus:outline-none focus:ring-1 focus:ring-bunq"
+                />
+                <button
+                  onClick={addManualMember}
+                  disabled={!manualEmail.includes('@')}
+                  className="p-2 bg-bunq/20 border border-bunq/30 rounded-xl text-bunq hover:bg-bunq/30 transition-all disabled:opacity-30"
+                >
+                  <UserPlus size={14} />
+                </button>
+              </div>
+              {manualMembers.map(m => (
+                <div key={m.alias} className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
+                  <span className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold">{m.name.charAt(0)}</span>
+                  <span>{m.name}</span>
+                  <span className="text-zinc-600 truncate">{m.alias}</span>
+                </div>
+              ))}
+            </div>
 
             {/* Actions */}
             <div className="flex gap-2 mt-1">

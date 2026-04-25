@@ -1,0 +1,71 @@
+[
+  {
+    "id": "1777100495901",
+    "name": "amici",
+    "emoji": "🎟️",
+    "color": "#00a86b",
+    "members": [
+      {
+        "name": "Francesco",
+        "alias": "test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com"
+      },
+      {
+        "name": "Giorgio",
+        "alias": "test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com"
+      },
+      {
+        "name": "Vaggelis",
+        "alias": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com"
+      },
+      {
+        "name": "Diego",
+        "alias": "test+0e48be1e-7446-4b25-b0ac-6c16fbb0f38d@bunq.com"
+      }
+    ],
+    "expenses": [],
+    "memberCount": 4,
+    "totalSpent": 0
+  },
+  {
+    "id": "1777101581166",
+    "name": "yyyyyyy",
+    "emoji": "🌍",
+    "color": "#00a86b",
+    "members": [
+      {
+        "name": "Vaggelis",
+        "alias": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com"
+      },
+      {
+        "name": "Diego",
+        "alias": "diego@sandbox.com"
+      },
+      {
+        "name": "Giorgio",
+        "alias": "giorgio@sandbox.com"
+      }
+    ],
+    "expenses": [
+      {
+        "batchId": 1777101613767,
+        "description": "Taxi Uber shared airport ride — paid by Diego for all 3",
+        "total": 34,
+        "date": "2026-04-25",
+        "splits": [
+          {
+            "name": "Vaggelis",
+            "alias": "test+bc8a4a53-f49f-46f9-9ec4-fd3da0e1ee46@bunq.com",
+            "amount": 11.33
+          },
+          {
+            "name": "Giorgio",
+            "alias": "giorgio@sandbox.com",
+            "amount": 11.33
+          }
+        ]
+      }
+    ],
+    "memberCount": 3,
+    "totalSpent": 34
+  }
+]

@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, Mic, Camera, Send, CheckCircle2, Settings, X, UserPlus } from 'lucide-react'
+import { ArrowLeft, Mic, Camera, Send, CheckCircle2, Settings, X, UserPlus, Trash2 } from 'lucide-react'
 import { Group, GroupExpense, ChatMessage, GroupMember } from '@/types/designer'
 import type { HistoryEntry } from '@/lib/claude/prompts'
 
@@ -10,8 +10,10 @@ interface GroupChatProps {
   onOpenAddExpense: () => void
   availableContacts?: GroupMember[]
   onUpdateGroup?: (updated: Group) => void
+  onDeleteGroup?: () => void
   onExpenseAdded?: (expense: GroupExpense) => void
   currentUser?: string
+  currentUserAlias?: string | null
 }
 
 type PendingSplit = {
@@ -20,53 +22,91 @@ type PendingSplit = {
   total: number
 }
 
-const STORAGE_KEY = (groupId: string) => `chat_${groupId}`
-
 const WELCOME = (groupName: string): ChatMessage => ({
   id: 'welcome',
   sender: 'agent',
+  senderName: 'AI',
   text: `Hey! I'm here to help you split expenses in ${groupName}.\n\nYou can say things like:\n• "Split last night's dinner between Giorgio and Diego"\n• "We spent €80 at the restaurant, split between everyone"\n• Or attach a photo of the receipt 📷`,
   timestamp: new Date().toISOString(),
 })
 
-export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddExpense, availableContacts = [], onUpdateGroup, onExpenseAdded, currentUser }) => {
+export const GroupChat: React.FC<GroupChatProps> = ({
+  group, onBack, onOpenAddExpense,
+  availableContacts = [], onUpdateGroup, onDeleteGroup,
+  onExpenseAdded, currentUser, currentUserAlias,
+}) => {
   const [showSettings, setShowSettings] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY(group.id))
-      if (saved) return JSON.parse(saved).messages ?? [WELCOME(group.name)]
-    } catch {}
-    return [WELCOME(group.name)]
-  })
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME(group.name)])
   const [history, setHistory] = useState<HistoryEntry[]>(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY(group.id))
-      if (saved) return JSON.parse(saved).history ?? []
-    } catch {}
-    return []
+      const saved = localStorage.getItem(`history_${group.id}`)
+      return saved ? JSON.parse(saved) : []
+    } catch { return [] }
   })
   const [inputText, setInputText] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [pendingSplit, setPendingSplit] = useState<PendingSplit | null>(null)
+  const [pendingReceipt, setPendingReceipt] = useState<{ items: any[]; total: number } | null>(null)
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
   const msgIdRef = useRef(0)
+  const knownIdsRef = useRef<Set<string>>(new Set(['welcome']))
 
-  useEffect(() => {
+  // Load chat from server on mount
+  const fetchChat = useCallback(async () => {
     try {
-      localStorage.setItem(STORAGE_KEY(group.id), JSON.stringify({ messages, history }))
-    } catch {}
-  }, [messages, history, group.id])
+      const res = await fetch(`/api/groups/${group.id}/chat`)
+      const data = await res.json()
+      if (!data.success || !data.data.length) return
+      const incoming: ChatMessage[] = data.data
+      setMessages(prev => {
+        const existingIds = new Set(prev.map((m: ChatMessage) => m.id))
+        const newOnes = incoming.filter((m: ChatMessage) => !existingIds.has(m.id))
+        return newOnes.length ? [...prev, ...newOnes] : prev
+      })
+      incoming.forEach((m: ChatMessage) => knownIdsRef.current.add(m.id))
+    } catch { /* ignore */ }
+  }, [group.id])
+
+  useEffect(() => { fetchChat() }, [fetchChat])
+
+  // Poll every 3s for real-time sync
+  useEffect(() => {
+    const interval = setInterval(fetchChat, 3000)
+    return () => clearInterval(interval)
+  }, [fetchChat])
+
+  // Persist history to localStorage on every change
+  useEffect(() => {
+    try { localStorage.setItem(`history_${group.id}`, JSON.stringify(history)) } catch {}
+  }, [history, group.id])
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
-  const addMessage = (sender: 'user' | 'agent', text: string) => {
-    setMessages(prev => [...prev, { id: String(++msgIdRef.current), sender, text, timestamp: new Date().toISOString() }])
+  const addMessage = (sender: 'user' | 'agent', text: string, persist = true): ChatMessage => {
+    const msg: ChatMessage = {
+      id: String(++msgIdRef.current),
+      sender,
+      senderName: sender === 'user' ? currentUser : 'AI',
+      text,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, msg])
+    knownIdsRef.current.add(msg.id)
+    if (persist) {
+      fetch(`/api/groups/${group.id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(msg),
+      }).catch(() => {})
+    }
+    return msg
   }
 
   const handleSend = async () => {
@@ -80,7 +120,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
   const processText = async (text: string) => {
     setIsProcessing(true)
     setPendingSplit(null)
-    addMessage('agent', '⏳ Searching your payments...')
+    addMessage('agent', pendingReceipt ? '⏳ Assigning items...' : '⏳ Searching your payments...', false)
     try {
       const res = await fetch('/api/split', {
         method: 'POST',
@@ -90,6 +130,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
           voiceInput: text,
           speaker: currentUser,
           history,
+          // Pass receipt data if a receipt was scanned and not yet split
+          ...(pendingReceipt ? { receipt: pendingReceipt } : {}),
         }),
       })
       const data = await res.json()
@@ -113,9 +155,12 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
         setMessages(prev => prev.slice(0, -1))
         addMessage('agent', `Here's the split for "${description}":\n${splitText}\n\nTotal: €${total.toFixed(2)}\n\n✅ Confirm and I'll send the payment requests via Bunq.`)
         setHistory(prev => [...prev, { userText: text, agentSummary: data.agentSummary ?? description }])
+        setPendingReceipt(null)
       } else {
         setMessages(prev => prev.slice(0, -1))
-        const errMsg = data.error ?? 'I didn\'t quite get that. Try: "Split €60 for dinner between Giorgio and Diego" or attach a photo of the receipt.'
+        const errMsg = data.error ?? (pendingReceipt
+          ? 'Could not assign items. Try: "Francesco gets the burger, Diego gets the pasta"'
+          : 'I didn\'t quite get that. Try: "Split €60 for dinner between Giorgio and Diego" or attach a photo of the receipt.')
         addMessage('agent', errMsg)
         setHistory(prev => [...prev, { userText: text, agentSummary: `Error: ${errMsg}` }])
       }
@@ -130,7 +175,12 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
     if (!pendingSplit) return
     setIsSending(true)
     try {
-      const recipients = pendingSplit.splits.filter(s => s.name !== currentUser)
+      // Exclude current user by alias (exact) or name (fallback)
+      const recipients = pendingSplit.splits.filter(s => {
+        if (currentUserAlias && s.alias === currentUserAlias) return false
+        if (!currentUserAlias && s.name === currentUser) return false
+        return true
+      })
       const res = await fetch('/api/bunq/split-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,9 +242,8 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
     const file = e.target.files?.[0]
     if (!file) return
     addMessage('user', `📷 Receipt photo: ${file.name}`)
-    addMessage('agent', '⏳ Reading receipt with Claude Vision...')
+    addMessage('agent', '⏳ Reading receipt with Claude Vision...', false)
     setIsProcessing(true)
-
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const base64 = (ev.target?.result as string).split(',')[1]
@@ -207,9 +256,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
         const data = await res.json()
         if (data.success) {
           const { items, total } = data.data
-          const itemList = items.map((i: any) => `• ${i.name}: €${i.price.toFixed(2)}`).join('\n')
+          setPendingReceipt({ items, total })
+          const itemList = items.map((i: any) => `• ${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}: €${i.price.toFixed(2)}`).join('\n')
           setMessages(prev => prev.slice(0, -1))
-          addMessage('agent', `Receipt scanned!\n${itemList}\n\n**Total: €${total.toFixed(2)}**\n\nWho should I split this between? (e.g. "split between Giorgio and Diego")`)
+          addMessage('agent', `Receipt scanned! 🧾\n\n${itemList}\n\nTotal: €${total.toFixed(2)}\n\nNow tell me how to split it — e.g.\n"Francesco pays the burger, I pay the beers"\n"Split equally between Giorgio and Diego"`)
         }
       } catch {
         setMessages(prev => prev.slice(0, -1))
@@ -245,7 +295,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
           </button>
           {onUpdateGroup && (
             <button
-              onClick={() => setShowSettings(true)}
+              onClick={() => { setShowSettings(true); setConfirmDelete(false) }}
               className="p-2 hover:bg-white/5 rounded-xl transition-all text-zinc-400 hover:text-white"
             >
               <Settings size={20} />
@@ -328,6 +378,38 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
                   </div>
                 </div>
               )}
+
+              {/* Delete group */}
+              {onDeleteGroup && (
+                <div className="pt-4 border-t border-zinc-800">
+                  {!confirmDelete ? (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-rose-500/20 text-rose-400 hover:bg-rose-500/10 transition-all text-sm font-semibold"
+                    >
+                      <Trash2 size={16} /> Delete Group
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-zinc-400 text-center">Delete this group and its chat history?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-2.5 rounded-2xl border border-zinc-700 text-zinc-400 hover:bg-zinc-800 transition-all text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => { setShowSettings(false); onDeleteGroup() }}
+                          className="flex-1 py-2.5 rounded-2xl bg-rose-500 text-white font-bold hover:bg-rose-600 transition-all text-sm"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -335,27 +417,34 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
 
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[70%] flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-bold text-[10px] ${
-                msg.sender === 'agent' ? 'bg-bunq text-black' : 'bg-zinc-800 text-zinc-400'
-              }`}>
-                {msg.sender === 'agent' ? 'AI' : 'IO'}
-              </div>
-              <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-                msg.sender === 'user'
-                  ? 'bg-bunq/10 border border-bunq/20 text-white'
-                  : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
-              }`}>
-                {msg.text}
-                <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+        {messages.map((msg) => {
+          const isAgent = msg.sender === 'agent'
+          const isOwnMessage = msg.sender === 'user' && msg.senderName === currentUser
+          return (
+            <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[70%] flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-bold text-[10px] ${
+                  isAgent ? 'bg-bunq text-black' : 'bg-zinc-800 text-zinc-400'
+                }`}>
+                  {isAgent ? 'AI' : (msg.senderName?.charAt(0) ?? '?')}
+                </div>
+                <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                  isOwnMessage
+                    ? 'bg-bunq/10 border border-bunq/20 text-white'
+                    : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
+                }`}>
+                  {!isAgent && !isOwnMessage && msg.senderName && (
+                    <p className="text-[10px] font-bold text-bunq uppercase tracking-widest mb-1">{msg.senderName}</p>
+                  )}
+                  {msg.text}
+                  <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
+                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {pendingSplit && !isProcessing && (
           <div className="flex justify-start pl-11">
@@ -373,6 +462,14 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
 
       {/* Input area */}
       <div className="p-6 pt-2 space-y-3">
+        {pendingReceipt && (
+          <div className="flex items-center justify-between bg-bunq/10 border border-bunq/30 rounded-2xl px-4 py-2.5">
+            <span className="text-xs text-bunq font-semibold">🧾 Receipt loaded — tell me who gets what</span>
+            <button onClick={() => setPendingReceipt(null)} className="text-zinc-500 hover:text-white transition-colors ml-3">
+              <X size={14} />
+            </button>
+          </div>
+        )}
 
         {/* Mic button — standalone, bunq-branded */}
         <div className="flex justify-center">

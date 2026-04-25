@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Sidebar, TopBar } from '@/components/layout/Shell'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { GroupsGrid } from '@/components/groups/GroupsGrid'
@@ -8,14 +8,6 @@ import { AddExpenseModal } from '@/components/expenses/AddExpenseModal'
 import { QuickPayModal } from '@/components/payments/QuickPayModal'
 import { Group, GroupExpense, Transaction, PaymentRequest, SplitResult } from '@/types/designer'
 
-// Sandbox users with placeholder aliases — real emails loaded from /api/bunq/members on mount
-const INITIAL_MEMBERS = [
-  { name: 'Francesco', userId: 3628453, alias: '' },
-  { name: 'Giorgio',   userId: 3628489, alias: '' },
-  { name: 'Vaggelis',  userId: 3628490, alias: '' },
-  { name: 'Diego',     userId: 3628491, alias: '' },
-]
-
 const ALL_MEMBERS = [
   { name: 'Francesco', alias: 'test+04f633e0-a0b9-462f-bb2f-d71d81d7d8ad@bunq.com' },
   { name: 'Giorgio',   alias: 'test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com' },
@@ -23,7 +15,7 @@ const ALL_MEMBERS = [
   { name: 'Diego',     alias: 'test+0e48be1e-7446-4b25-b0ac-6c16fbb0f38d@bunq.com' },
 ]
 
-const INITIAL_GROUPS: Group[] = [
+const SEED_GROUPS: Group[] = [
   {
     id: '1', name: 'Weekend Trip', emoji: '✈️', color: '#8b5cf6',
     members: ALL_MEMBERS,
@@ -44,15 +36,30 @@ export const MeditaSplit: React.FC = () => {
   const [balance, setBalance] = useState('0.00')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [requests, setRequests] = useState<PaymentRequest[]>([])
-  const [groups, setGroups] = useState<Group[]>(() => {
-    if (typeof window === 'undefined') return INITIAL_GROUPS
-    try {
-      const saved = localStorage.getItem('meditasplit_groups')
-      return saved ? JSON.parse(saved) : INITIAL_GROUPS
-    } catch { return INITIAL_GROUPS }
-  })
-  const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>(INITIAL_MEMBERS)
+  const [groups, setGroups] = useState<Group[]>([])
+  const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>([])
   const [currentUser, setCurrentUser] = useState('Me')
+  const [currentUserAlias, setCurrentUserAlias] = useState<string | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const fetchGroups = useCallback(async () => {
+    try {
+      const res = await fetch('/api/groups')
+      const data = await res.json()
+      if (data.success) {
+        if (data.data.length === 0) {
+          // Seed server with default groups on first use
+          await Promise.all(SEED_GROUPS.map(g =>
+            fetch('/api/groups', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(g) })
+          ))
+          setGroups(SEED_GROUPS)
+        } else {
+          setGroups(data.data)
+          setSelectedGroup(prev => prev ? (data.data.find((g: Group) => g.id === prev.id) ?? null) : null)
+        }
+      }
+    } catch { /* ignore */ }
+  }, [])
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -62,7 +69,10 @@ export const MeditaSplit: React.FC = () => {
       ])
       const [membersData, meData] = await Promise.all([membersRes.json(), meRes.json()])
       if (membersData.success) setMemberAliases(membersData.data)
-      if (meData.success) setCurrentUser(meData.data.name)
+      if (meData.success) {
+        setCurrentUser(meData.data.name)
+        if (meData.data.alias) setCurrentUserAlias(meData.data.alias)
+      }
     } catch { /* keep placeholders */ }
   }, [])
 
@@ -109,11 +119,17 @@ export const MeditaSplit: React.FC = () => {
     }
   }, [])
 
-  useEffect(() => { fetchData(); fetchMembers() }, [fetchData, fetchMembers])
+  useEffect(() => { fetchData(); fetchMembers(); fetchGroups() }, [fetchData, fetchMembers, fetchGroups])
 
+  // Poll groups every 5s when on groups tab
   useEffect(() => {
-    try { localStorage.setItem('meditasplit_groups', JSON.stringify(groups)) } catch { /* ignore */ }
-  }, [groups])
+    if (activeTab === 'groups') {
+      pollRef.current = setInterval(fetchGroups, 5000)
+    } else {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    }
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [activeTab, fetchGroups])
 
   const handleAcceptRequest = async (id: string) => {
     try {
@@ -129,30 +145,59 @@ export const MeditaSplit: React.FC = () => {
     }
   }
 
-  const handleUpdateGroup = (updated: Group) => {
-    setGroups(prev => prev.map(g => g.id === updated.id ? updated : g))
-    setSelectedGroup(updated)
-  }
-
-  const handleCreateGroup = (name: string, emoji: string, color: string, members: { name: string; alias: string }[]) => {
-    const chosenMembers = members.length > 0 ? members : ALL_MEMBERS
+  const handleCreateGroup = async (name: string, emoji: string, color: string, members: { name: string; alias: string }[]) => {
     const newGroup: Group = {
       id: Date.now().toString(),
       name, emoji, color,
-      members: chosenMembers,
+      members,
       expenses: [],
-      memberCount: chosenMembers.length,
+      memberCount: members.length,
       totalSpent: 0,
     }
     setGroups(prev => [...prev, newGroup])
+    await fetch('/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newGroup),
+    }).catch(() => {})
+    fetchGroups()
   }
 
-  const handleGroupExpenseAdded = (groupId: string, expense: GroupExpense) => {
-    setGroups(prev => prev.map(g => {
-      if (g.id !== groupId) return g
-      const expenses = [...g.expenses, expense]
-      return { ...g, expenses, totalSpent: expenses.reduce((s, e) => s + e.total, 0) }
-    }))
+  const handleUpdateGroup = async (updated: Group) => {
+    setSelectedGroup(updated)
+    setGroups(prev => prev.map(g => g.id === updated.id ? updated : g))
+    await fetch(`/api/groups/${updated.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {})
+    fetchGroups()
+  }
+
+  const handleDeleteGroup = async (groupId: string) => {
+    try {
+      await Promise.all([
+        fetch(`/api/groups/${groupId}`, { method: 'DELETE' }),
+        fetch(`/api/groups/${groupId}/chat`, { method: 'DELETE' }),
+      ])
+    } catch (e) {
+      console.error('handleDeleteGroup error:', e)
+    }
+    setSelectedGroup(null)
+    fetchGroups()
+  }
+
+  const handleGroupExpenseAdded = async (groupId: string, expense: GroupExpense) => {
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+    const expenses = [...group.expenses, expense]
+    const updated = { ...group, expenses, totalSpent: expenses.reduce((s, e) => s + e.total, 0) }
+    setGroups(prev => prev.map(g => g.id === groupId ? updated : g))
+    await fetch(`/api/groups/${groupId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {})
   }
 
   const handleConfirmExpense = async (description: string, total: number, splits: SplitResult[]) => {
@@ -164,11 +209,7 @@ export const MeditaSplit: React.FC = () => {
           const fromState = memberAliases.find(m => m.name === s.name)
           const fromGroup = activeGroup?.members.find(m => m.name === s.name)
           const alias = fromState?.alias || fromGroup?.alias || `${s.name.toLowerCase()}@sandbox.com`
-          return {
-            name: s.name,
-            alias,
-            amount: parseFloat(s.amount as string),
-          }
+          return { name: s.name, alias, amount: parseFloat(s.amount as string) }
         })
       const res = await fetch('/api/bunq/split-group', {
         method: 'POST',
@@ -178,7 +219,7 @@ export const MeditaSplit: React.FC = () => {
       const data = await res.json()
       if (!data.success) console.error('Split group error:', data.error)
       if (selectedGroup && data.batchId) {
-        handleGroupExpenseAdded(selectedGroup.id, {
+        await handleGroupExpenseAdded(selectedGroup.id, {
           batchId: data.batchId,
           description,
           total,
@@ -196,6 +237,9 @@ export const MeditaSplit: React.FC = () => {
   const openQuickPay = () => setIsQuickPayOpen(true)
 
   const activeGroup = selectedGroup ?? groups[0]
+  const availableContacts = memberAliases.length > 0
+    ? memberAliases.map(m => ({ name: m.name, alias: m.alias }))
+    : ALL_MEMBERS
 
   return (
     <div className="min-h-screen bg-background text-white flex">
@@ -219,10 +263,7 @@ export const MeditaSplit: React.FC = () => {
           {activeTab === 'groups' && !selectedGroup && (
             <GroupsGrid
               groups={groups}
-              availableContacts={ALL_MEMBERS.map(m => {
-                const live = memberAliases.find(a => a.name === m.name)
-                return { name: m.name, alias: live?.alias || m.alias }
-              })}
+              availableContacts={availableContacts}
               onSelectGroup={setSelectedGroup}
               onCreateGroup={handleCreateGroup}
             />
@@ -233,13 +274,12 @@ export const MeditaSplit: React.FC = () => {
               group={selectedGroup}
               onBack={() => setSelectedGroup(null)}
               onOpenAddExpense={openAddExpense}
-              availableContacts={ALL_MEMBERS.map(m => {
-                const live = memberAliases.find(a => a.name === m.name)
-                return { name: m.name, alias: live?.alias || m.alias }
-              })}
+              availableContacts={availableContacts}
               onUpdateGroup={handleUpdateGroup}
+              onDeleteGroup={() => handleDeleteGroup(selectedGroup.id)}
               onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
               currentUser={currentUser}
+              currentUserAlias={currentUserAlias}
             />
           )}
         </main>
