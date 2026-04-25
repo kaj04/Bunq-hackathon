@@ -55,6 +55,90 @@
       "senderName": "AI",
       "text": "Here's the split for \"Taxi Uber shared airport ride — split for Diego, Francesco\":\n• Francesco: €11.33\n• Diego: €11.33\n\nTotal: €22.66\n\n✅ Confirm and I'll send the payment requests via Bunq.",
       "timestamp": "2026-04-25T07:26:34.171Z"
+    },
+    {
+      "id": "7",
+      "sender": "user",
+      "senderName": "Francesco",
+      "text": "🎤 \"No I pay only the Glocky\"",
+      "timestamp": "2026-04-25T07:47:02.339Z"
+    },
+    {
+      "id": "9",
+      "sender": "agent",
+      "senderName": "AI",
+      "text": "I couldn't find a payment called \"Glocky\" and it doesn't match any group member. Could you help me clarify?",
+      "timestamp": "2026-04-25T07:47:10.125Z",
+      "widgets": [
+        {
+          "label": "💰 Enter amount manually",
+          "value": "I pay only the Glocky, the total was €"
+        },
+        {
+          "label": "📅 Search further back (2 weeks)",
+          "value": "I pay only the Glocky, search in the last 14 days"
+        },
+        {
+          "label": "🔤 It's a nickname for a place — let me rephrase",
+          "value": "Split the Glocky expense — it was at"
+        }
+      ]
+    },
+    {
+      "id": "10",
+      "sender": "user",
+      "senderName": "Francesco",
+      "text": "I pay only the Glocky, the total was €",
+      "timestamp": "2026-04-25T07:47:29.069Z"
+    },
+    {
+      "id": "12",
+      "sender": "agent",
+      "senderName": "AI",
+      "text": "I couldn't find a payment called \"Glocky\" and the total amount seems to be missing. Could you clarify?",
+      "timestamp": "2026-04-25T07:47:37.416Z",
+      "widgets": [
+        {
+          "label": "🔍 Search further back (30 days)",
+          "value": "I pay only the Glocky, search the last 30 days"
+        },
+        {
+          "label": "💬 Enter amount manually",
+          "value": "I pay only the Glocky, the total was €[amount]"
+        },
+        {
+          "label": "📋 Use previous split total (€54.50)",
+          "value": "I pay only the Glocky, the total was €54.50"
+        }
+      ]
+    },
+    {
+      "id": "13",
+      "sender": "user",
+      "senderName": "Francesco",
+      "text": "gloky was in the receipt I sent you",
+      "timestamp": "2026-04-25T07:48:27.219Z"
+    },
+    {
+      "id": "15",
+      "sender": "agent",
+      "senderName": "AI",
+      "text": "I couldn't find a receipt or a payment called 'Gloky/Glocky'. Could you clarify?",
+      "timestamp": "2026-04-25T07:48:35.961Z",
+      "widgets": [
+        {
+          "label": "📷 It's a place name — tell me the amount",
+          "value": "Gloky total was €___ split between Francesco, Diego and Giorgio"
+        },
+        {
+          "label": "🔍 Search by a different name",
+          "value": "Search for the payment called ___ from ___ days ago"
+        },
+        {
+          "label": "✏️ Enter amount manually",
+          "value": "Split €___ for Gloky between ___"
+        }
+      ]
     }
   ],
   "1777101581166": [

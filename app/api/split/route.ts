@@ -195,9 +195,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
 
     const jsonMatch = finalText.match(/\{[\s\S]*\}/)
     const parsed = JSON.parse(jsonMatch?.[0] ?? '{}')
+    const widgets = Array.isArray(parsed.suggestions) ? parsed.suggestions : []
 
+    // ── Question from agent (needs clarification) ─────────────────────────────
+    if (parsed.question) {
+      return NextResponse.json({ success: false, error: parsed.question, isQuestion: true, widgets })
+    }
+
+    // ── Hard error ────────────────────────────────────────────────────────────
     if (parsed.error) {
-      return NextResponse.json({ success: false, error: parsed.error })
+      return NextResponse.json({ success: false, error: parsed.error, widgets })
     }
 
     const splits = parsed.splits ?? []
@@ -207,6 +214,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
       return NextResponse.json({
         success: false,
         error: parsed.message ?? "I couldn't determine who to split with. Please name group members or provide an amount.",
+        widgets,
       })
     }
 
@@ -228,7 +236,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
       .filter((s: any) => s.participant.name)
 
     const agentSummary = `Split €${parsed.total?.toFixed(2) ?? '?'} for "${description}" → ${result.map(r => `${r.participant.name}: €${r.amount.toFixed(2)}`).join(', ')}`
-    return NextResponse.json({ success: true, data: result, description, agentSummary })
+    return NextResponse.json({ success: true, data: result, description, agentSummary, widgets })
   } catch (err) {
     console.error('Split Agent Error:', err)
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 })

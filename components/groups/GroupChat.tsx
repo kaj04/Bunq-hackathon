@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { ArrowLeft, Mic, Camera, Send, CheckCircle2, Settings, X, UserPlus, Trash2 } from 'lucide-react'
-import { Group, GroupExpense, ChatMessage, GroupMember } from '@/types/designer'
+import { Group, GroupExpense, ChatMessage, GroupMember, Widget } from '@/types/designer'
 import type { HistoryEntry } from '@/lib/claude/prompts'
 
 interface GroupChatProps {
@@ -89,13 +89,14 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
-  const addMessage = (sender: 'user' | 'agent', text: string, persist = true): ChatMessage => {
+  const addMessage = (sender: 'user' | 'agent', text: string, persist = true, widgets?: Widget[]): ChatMessage => {
     const msg: ChatMessage = {
       id: String(++msgIdRef.current),
       sender,
       senderName: sender === 'user' ? currentUser : 'AI',
       text,
       timestamp: new Date().toISOString(),
+      ...(widgets?.length ? { widgets } : {}),
     }
     setMessages(prev => [...prev, msg])
     knownIdsRef.current.add(msg.id)
@@ -109,6 +110,12 @@ export const GroupChat: React.FC<GroupChatProps> = ({
     return msg
   }
 
+  const handleWidgetClick = (value: string) => {
+    if (isProcessing) return
+    addMessage('user', value)
+    processText(value)
+  }
+
   const handleSend = async () => {
     const text = inputText.trim()
     if (!text) return
@@ -120,7 +127,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({
   const processText = async (text: string) => {
     setIsProcessing(true)
     setPendingSplit(null)
-    addMessage('agent', pendingReceipt ? '⏳ Assigning items...' : '⏳ Searching your payments...', false)
+    addMessage('agent', '⏳ Thinking...', false)
     try {
       const res = await fetch('/api/split', {
         method: 'POST',
@@ -130,11 +137,11 @@ export const GroupChat: React.FC<GroupChatProps> = ({
           voiceInput: text,
           speaker: currentUser,
           history,
-          // Pass receipt data if a receipt was scanned and not yet split
           ...(pendingReceipt ? { receipt: pendingReceipt } : {}),
         }),
       })
       const data = await res.json()
+      const widgets: Widget[] = Array.isArray(data.widgets) && data.widgets.length > 0 ? data.widgets : []
 
       if (data.success && data.data?.length > 0) {
         const splits = data.data
@@ -153,16 +160,16 @@ export const GroupChat: React.FC<GroupChatProps> = ({
         })
 
         setMessages(prev => prev.slice(0, -1))
-        addMessage('agent', `Here's the split for "${description}":\n${splitText}\n\nTotal: €${total.toFixed(2)}\n\n✅ Confirm and I'll send the payment requests via Bunq.`)
+        addMessage('agent', `Here's the split for "${description}":\n${splitText}\n\nTotal: €${total.toFixed(2)}\n\n✅ Confirm to send payment requests via Bunq.`, true, widgets)
         setHistory(prev => [...prev, { userText: text, agentSummary: data.agentSummary ?? description }])
         setPendingReceipt(null)
       } else {
         setMessages(prev => prev.slice(0, -1))
-        const errMsg = data.error ?? (pendingReceipt
+        const responseText = data.error ?? (pendingReceipt
           ? 'Could not assign items. Try: "Francesco gets the burger, Diego gets the pasta"'
-          : 'I didn\'t quite get that. Try: "Split €60 for dinner between Giorgio and Diego" or attach a photo of the receipt.')
-        addMessage('agent', errMsg)
-        setHistory(prev => [...prev, { userText: text, agentSummary: `Error: ${errMsg}` }])
+          : "I didn't quite get that. Try: \"Split €60 for dinner between Giorgio and Diego\" or attach a photo of the receipt.")
+        addMessage('agent', responseText, true, widgets)
+        setHistory(prev => [...prev, { userText: text, agentSummary: `${data.isQuestion ? 'Question' : 'Error'}: ${responseText}` }])
       }
     } catch {
       setMessages(prev => prev.slice(0, -1))
@@ -258,8 +265,16 @@ export const GroupChat: React.FC<GroupChatProps> = ({
           const { items, total } = data.data
           setPendingReceipt({ items, total })
           const itemList = items.map((i: any) => `• ${i.name}${i.quantity > 1 ? ` ×${i.quantity}` : ''}: €${i.price.toFixed(2)}`).join('\n')
+          const memberNames = group.members.map(m => m.name)
+          const receiptWidgets: Widget[] = [
+            { label: `✂️ Split equally among all (${memberNames.join(', ')})`, value: `Split the receipt equally among ${memberNames.join(', ')}` },
+            { label: '📋 I\'ll describe who ordered what', value: 'Let me tell you who ordered what from this receipt' },
+            ...(memberNames.length > 2
+              ? [{ label: '👥 Split between some members', value: 'Who should split this receipt?' }]
+              : [])
+          ]
           setMessages(prev => prev.slice(0, -1))
-          addMessage('agent', `Receipt scanned! 🧾\n\n${itemList}\n\nTotal: €${total.toFixed(2)}\n\nNow tell me how to split it — e.g.\n"Francesco pays the burger, I pay the beers"\n"Split equally between Giorgio and Diego"`)
+          addMessage('agent', `Receipt scanned! 🧾\n\n${itemList}\n\nTotal: €${total.toFixed(2)}\n\nHow should I split this?`, true, receiptWidgets)
         }
       } catch {
         setMessages(prev => prev.slice(0, -1))
@@ -422,24 +437,41 @@ export const GroupChat: React.FC<GroupChatProps> = ({
           const isOwnMessage = msg.sender === 'user' && msg.senderName === currentUser
           return (
             <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[70%] flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
+              <div className={`max-w-[75%] flex gap-3 ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
                 <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-bold text-[10px] ${
                   isAgent ? 'bg-bunq text-black' : 'bg-zinc-800 text-zinc-400'
                 }`}>
                   {isAgent ? 'AI' : (msg.senderName?.charAt(0) ?? '?')}
                 </div>
-                <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-                  isOwnMessage
-                    ? 'bg-bunq/10 border border-bunq/20 text-white'
-                    : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
-                }`}>
-                  {!isAgent && !isOwnMessage && msg.senderName && (
-                    <p className="text-[10px] font-bold text-bunq uppercase tracking-widest mb-1">{msg.senderName}</p>
+                <div className="flex flex-col gap-2">
+                  <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                    isOwnMessage
+                      ? 'bg-bunq/10 border border-bunq/20 text-white'
+                      : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
+                  }`}>
+                    {!isAgent && !isOwnMessage && msg.senderName && (
+                      <p className="text-[10px] font-bold text-bunq uppercase tracking-widest mb-1">{msg.senderName}</p>
+                    )}
+                    {msg.text}
+                    <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  {/* Widget buttons — clickable choices from the agent */}
+                  {isAgent && msg.widgets && msg.widgets.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                      {msg.widgets.map((w, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleWidgetClick(w.value)}
+                          disabled={isProcessing}
+                          className="text-left px-4 py-2.5 rounded-2xl border border-bunq/30 bg-bunq/10 text-bunq text-xs font-semibold hover:bg-bunq/20 hover:border-bunq/50 active:scale-[0.98] transition-all disabled:opacity-40 shadow-sm"
+                        >
+                          {w.label}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                  {msg.text}
-                  <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
-                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
                 </div>
               </div>
             </div>

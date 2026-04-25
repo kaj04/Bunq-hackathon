@@ -1,9 +1,17 @@
+export interface Widget {
+  label: string
+  value: string
+  metadata?: Record<string, any>
+}
+
 export interface ChatMessage {
   id: string
   sender: 'user' | 'agent'
   senderName?: string
   text: string
   timestamp: string
+  widgets?: Widget[]
+  isQuestion?: boolean
   attachment?: { type: 'receipt'; url: string }
 }
 
