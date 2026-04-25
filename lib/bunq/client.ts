@@ -222,9 +222,7 @@ export async function acceptPaymentRequest(requestResponseId: number) {
 }
 
 export async function getBunqContacts(): Promise<BunqContact[]> {
-  if (MOCK) return MOCK_CONTACTS
-  if (!_s.sessionToken) await initBunq()
-  // Bunq sandbox has no contact API — use hardcoded team members for demo
+  // Bunq sandbox has no contacts API — always return hardcoded team members
   return MOCK_CONTACTS
 }
 
