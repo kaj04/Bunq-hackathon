@@ -267,13 +267,18 @@ export async function getTransactions(count = 20) {
   const res = await bunqReq('GET', `/user/${_s.userId}/monetary-account/${_s.accountId}/payment`)
   return res.Response.slice(0, count).map((r: any) => {
     const p = r.Payment
+    const counterpartyName: string = p?.counterparty_alias?.display_name ?? ''
+    const counterpartyEmail: string = p?.counterparty_alias?.bunq_me?.value
+      ?? p?.counterparty_alias?.label_user?.display_name
+      ?? ''
     return {
       id: p?.id,
       amount: p?.amount?.value,
       currency: p?.amount?.currency,
-      description: p?.description,
+      description: p?.description ?? '',
       type: parseFloat(p?.amount?.value) > 0 ? 'in' : 'out',
-      counterparty: p?.counterparty_alias?.display_name,
+      counterparty: counterpartyName,
+      isSugarDaddy: counterpartyName === 'Sugar Daddy',
       date: p?.created,
     }
   })

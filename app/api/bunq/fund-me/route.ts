@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const body = JSON.stringify({
       amount_inquired: { value: Number(amount).toFixed(2), currency: 'EUR' },
       counterparty_alias: { type: 'EMAIL', value: 'sugardaddy@bunq.com' },
-      description: 'MeditaSplit sandbox top-up',
+      description: `Top-up €${Number(amount).toFixed(2)}`,
       allow_bunqme: false,
     })
 

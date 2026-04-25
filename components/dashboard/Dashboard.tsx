@@ -125,18 +125,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
           <div className="bg-card rounded-[24px] border border-zinc-800 overflow-hidden shadow-sm">
             <table className="w-full text-sm text-left border-separate border-spacing-0">
               <tbody>
-                {transactions.length > 0 ? transactions.map((tx, idx) => (
+                {transactions.length > 0 ? transactions.map((tx, idx) => {
+                  // For outgoing payments: description carries category+location+time — show it as primary
+                  // For incoming top-ups from Sugar Daddy: show "Sugar Daddy" as primary, description as subtitle
+                  const isTopUp = tx.type === 'income' && tx.isSugarDaddy
+                  const primaryLabel = isTopUp ? tx.counterparty : (tx.description || tx.counterparty)
+                  const secondaryLabel = isTopUp ? tx.description : null
+                  return (
                   <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
                     <td className="py-4 px-4">
-                      <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">{tx.description || tx.counterparty}</p>
-                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">{tx.counterparty}</p>
+                      <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">{primaryLabel}</p>
+                      {secondaryLabel && <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{secondaryLabel}</p>}
                     </td>
                     <td className="py-4 px-4 text-zinc-500 text-xs italic opacity-60 font-medium">{tx.groupName || 'Direct'}</td>
                     <td className={`py-4 px-4 text-right font-bold tabular-nums ${tx.type === 'income' ? 'text-bunq' : 'text-rose-500'}`}>
                       {tx.type === 'income' ? '+' : '-'} € {Math.abs(tx.amount).toFixed(2)}
                     </td>
                   </tr>
-                )) : (
+                  )
+                }) : (
                   <tr>
                     <td colSpan={3} className="py-12 text-center text-zinc-600 italic">No transactions found.</td>
                   </tr>

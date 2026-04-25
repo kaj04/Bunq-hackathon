@@ -85,6 +85,7 @@ export const MeditaSplit: React.FC = () => {
             id: tx.id,
             description: tx.description ?? '',
             counterparty: tx.counterparty ?? '',
+            isSugarDaddy: tx.isSugarDaddy ?? false,
             amount: Math.abs(parseFloat(tx.amount)),
             type: tx.type === 'in' ? 'income' : 'outcome',
             date: tx.date ?? '',

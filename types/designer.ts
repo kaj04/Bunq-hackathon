@@ -12,6 +12,7 @@ export interface Transaction {
   description: string
   type: 'income' | 'outcome'
   counterparty: string
+  isSugarDaddy?: boolean
   date: string
   groupName?: string
 }
