@@ -1,5 +1,6 @@
 import { getBunqSession, bunqGetPublic } from './client'
 import { MOCK_PAYMENTS } from './mock-data'
+import { isMock } from '@/lib/mock-flag'
 import type { BunqPayment } from '@/types'
 
 const PAGE_SIZE = 50
@@ -18,7 +19,7 @@ function isRecurring(payment: any): boolean {
 }
 
 export async function searchRecentPayments(query: string, days: number): Promise<BunqPayment[]> {
-  if (process.env.BUNQ_MOCK === 'true') {
+  if (isMock()) {
     return filterMockPayments(MOCK_PAYMENTS, query, days)
   }
   const { userId, accountId } = await getBunqSession()

@@ -1,5 +1,5 @@
 'use client'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Home, Users, Search } from 'lucide-react'
 
 interface SidebarProps {
@@ -8,6 +8,22 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+  const [mock, setMockState] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/dev/mock-mode').then(r => r.json()).then(d => setMockState(d.mock))
+  }, [])
+
+  const toggleMock = async () => {
+    const next = !mock
+    setMockState(next)
+    await fetch('/api/dev/mock-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mock: next }),
+    })
+  }
+
   const menuItems = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'groups', icon: Users, label: 'Groups' },
@@ -34,7 +50,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
         ))}
       </nav>
 
-      <div className="mt-auto pt-6">
+      <div className="mt-auto pt-6 space-y-4">
+        {/* Mock / Live toggle */}
+        {mock !== null && (
+          <button
+            onClick={toggleMock}
+            title={mock ? 'Switch to real Bunq API' : 'Switch to synthetic data'}
+            className={`w-full flex items-center justify-between px-4 py-2.5 rounded-2xl border transition-all ${
+              mock
+                ? 'bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20'
+                : 'bg-bunq/10 border-bunq/30 hover:bg-bunq/20'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm">{mock ? '🧪' : '🔌'}</span>
+              <span className={`text-xs font-bold uppercase tracking-wide ${mock ? 'text-amber-400' : 'text-bunq'}`}>
+                {mock ? 'Synthetic' : 'Live Bunq'}
+              </span>
+            </div>
+            <div className={`w-8 h-4 rounded-full transition-all relative ${mock ? 'bg-amber-500' : 'bg-bunq'}`}>
+              <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${mock ? 'left-0.5' : 'left-4'}`} />
+            </div>
+          </button>
+        )}
+
         <div className="flex items-center gap-2 pr-2 px-2">
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10" />
           <div className="flex flex-col">
