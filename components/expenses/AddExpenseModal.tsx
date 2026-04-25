@@ -25,6 +25,8 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, current
   const [isDescribeRecording, setIsDescribeRecording] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [clarification, setClarification] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [imagePrompt, setImagePrompt] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
@@ -37,8 +39,13 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, current
     reader.readAsDataURL(blob)
   })
 
-  const processReceiptImage = async (file: File) => {
+  const handleFileSelect = (file: File) => {
+    setSelectedFile(file)
     setMode('camera')
+  }
+
+  const processReceiptWithPrompt = async () => {
+    if (!selectedFile) return
     setStep('process')
     const texts = ['Scanning receipt structure...', 'Extracting line items...', 'Identifying prices...', 'Finalizing...']
     let i = 0
@@ -51,20 +58,24 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, current
         const res = await fetch('/api/receipt', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+          body: JSON.stringify({ imageBase64: base64, mediaType: selectedFile.type }),
         })
         const data = await res.json()
         clearInterval(interval)
         if (data.success) {
           setReceiptData(data.data)
-          setStep('voice-after-scan')
+          if (imagePrompt.trim()) {
+            await getSplits(data.data.total, imagePrompt, data.data)
+          } else {
+            setStep('voice-after-scan')
+          }
         } else {
           setStep('select')
           alert('Could not read receipt. Please try again or use manual entry.')
         }
       } catch { clearInterval(interval); setStep('select') }
     }
-    reader.readAsDataURL(file)
+    reader.readAsDataURL(selectedFile)
   }
 
   const getSplits = async (total: number, voiceInput = '', receiptOverride?: ReceiptData | null) => {
@@ -267,7 +278,33 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, current
                   </button>
                 ))}
               </div>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) processReceiptImage(e.target.files[0]) }} />
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]) }} />
+
+              {selectedFile && mode === 'camera' && (
+                <div className="space-y-4 pt-4 border-t border-zinc-800">
+                  <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+                    <div className="w-12 h-12 bg-bunq/20 rounded-xl flex items-center justify-center text-bunq">
+                      <Camera size={24} />
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="text-sm font-bold truncate">{selectedFile.name}</p>
+                      <p className="text-xs text-white/40">Ready to scan</p>
+                    </div>
+                    <button onClick={() => setSelectedFile(null)} className="text-white/20 hover:text-white">
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <input 
+                    value={imagePrompt} 
+                    onChange={e => setImagePrompt(e.target.value)}
+                    placeholder="Add context (e.g. 'Mario paid for the pizza')"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-bunq" 
+                  />
+                  <button onClick={processReceiptWithPrompt} className="btn-primary w-full !py-4 shadow-xl shadow-bunq/20">
+                    Scan and Split with AI
+                  </button>
+                </div>
+              )}
 
               {mode === 'manual' && (
                 <div className="space-y-4 pt-4 border-t border-zinc-800">

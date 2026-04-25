@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { ArrowLeft, Mic, Camera, Send, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Mic, Camera, Send, CheckCircle2, X } from 'lucide-react'
 import { Group, GroupExpense, ChatMessage } from '@/types/designer'
 
 interface GroupChatProps {
@@ -26,6 +26,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
     },
   ])
   const [inputText, setInputText] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
   const [pendingSplit, setPendingSplit] = useState<PendingSplit | null>(null)
@@ -44,10 +45,94 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
 
   const handleSend = async () => {
     const text = inputText.trim()
-    if (!text) return
+    if (!text && !selectedFile) return
+    
+    const currentFile = selectedFile
     setInputText('')
-    addMessage('user', text)
-    await processText(text)
+    setSelectedFile(null)
+
+    if (currentFile) {
+      addMessage('user', `${text ? `${text}\n` : ''}📷 Foto scontrino: ${currentFile.name}`)
+      await processImageAndText(currentFile, text)
+    } else {
+      addMessage('user', text)
+      await processText(text)
+    }
+  }
+
+  const processImageAndText = async (file: File, prompt: string) => {
+    setIsProcessing(true)
+    setPendingSplit(null)
+    addMessage('agent', '⏳ Sto leggendo lo scontrino ed elaborando la divisione...')
+    
+    try {
+      const reader = new FileReader()
+      const receiptDataPromise = new Promise<any>((resolve, reject) => {
+        reader.onload = async (ev) => {
+          const base64 = (ev.target?.result as string).split(',')[1]
+          try {
+            const res = await fetch('/api/receipt', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+            })
+            const data = await res.json()
+            if (data.success) resolve(data.data)
+            else reject(new Error('Failed to read receipt'))
+          } catch (e) { reject(e) }
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      const receiptData = await receiptDataPromise
+
+      const txRes = await fetch('/api/bunq/transactions')
+      const txData = await txRes.json()
+      const recentTransactions = txData.success ? txData.data : []
+
+      const res = await fetch('/api/split', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          receipt: receiptData,
+          participants: group.members.map(m => m.name),
+          voiceInput: prompt,
+          recentTransactions,
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success && data.data?.length > 0) {
+        const splits = data.data
+        const total = splits.reduce((s: number, x: any) => s + x.amount, 0)
+        const description: string = data.description ?? (prompt || 'Spesa scontrino')
+        const splitText = splits.map((s: any) => `• ${s.participant.name}: €${s.amount.toFixed(2)}`).join('\n')
+
+        setPendingSplit({
+          splits: splits.map((s: any) => {
+            const member = group.members.find(m => m.name === s.participant.name)
+            return {
+              name: s.participant.name,
+              alias: member?.alias ?? `${s.participant.name.toLowerCase()}@sandbox.com`,
+              amount: s.amount,
+            }
+          }),
+          description,
+          total,
+        })
+
+        setMessages(prev => prev.slice(0, -1))
+        addMessage('agent', `Ecco la divisione per "${description}":\n${splitText}\n\nTotale: €${total.toFixed(2)}\n\n✅ Confermi e invio le richieste di pagamento via Bunq?`)
+      } else {
+        setMessages(prev => prev.slice(0, -1))
+        addMessage('agent', 'Scontrino letto, ma non ho capito come dividerlo. Prova a dirmelo di nuovo.')
+      }
+    } catch (err) {
+      setMessages(prev => prev.slice(0, -1))
+      addMessage('agent', 'Qualcosa è andato storto nella lettura dello scontrino. Riprova.')
+    }
+    setIsProcessing(false)
   }
 
   const processText = async (text: string) => {
@@ -162,37 +247,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
 
   const stopVoice = () => { recognitionRef.current?.stop(); setIsRecording(false) }
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    addMessage('user', `📷 Foto scontrino: ${file.name}`)
-    addMessage('agent', '⏳ Sto leggendo lo scontrino con Claude Vision...')
-    setIsProcessing(true)
-
-    const reader = new FileReader()
-    reader.onload = async (ev) => {
-      const base64 = (ev.target?.result as string).split(',')[1]
-      try {
-        const res = await fetch('/api/receipt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
-        })
-        const data = await res.json()
-        if (data.success) {
-          const { items, total } = data.data
-          const itemList = items.map((i: any) => `• ${i.name}: €${i.price.toFixed(2)}`).join('\n')
-          setMessages(prev => prev.slice(0, -1))
-          addMessage('agent', `Scontrino letto!\n${itemList}\n\n**Totale: €${total.toFixed(2)}**\n\nCon chi devo dividere? (es. "dividi tra Giorgio e Diego")`)
-        }
-      } catch {
-        setMessages(prev => prev.slice(0, -1))
-        addMessage('agent', 'Non riesco a leggere lo scontrino. Prova con una foto più nitida.')
-      }
-      setIsProcessing(false)
-    }
-    reader.readAsDataURL(file)
-    // Reset input so the same file can be re-uploaded
+    setSelectedFile(file)
     e.target.value = ''
   }
 
@@ -256,10 +314,19 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
       {/* Input bar */}
       <div className="p-6 pt-2">
         <div className="bg-card rounded-[28px] border border-zinc-800 p-2 pl-4 flex items-center gap-2 shadow-2xl">
-          <button onClick={() => fileRef.current?.click()} className="p-3 text-zinc-500 hover:text-white transition-colors" title="Allega foto scontrino">
+          <button onClick={() => fileRef.current?.click()} className={`p-3 transition-colors ${selectedFile ? 'text-bunq' : 'text-zinc-500 hover:text-white'}`} title="Allega foto scontrino">
             <Camera size={20} />
           </button>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+
+          {selectedFile && (
+            <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/10 max-w-[150px]">
+              <span className="text-[10px] font-bold truncate text-white/60">{selectedFile.name}</span>
+              <button onClick={() => setSelectedFile(null)} className="text-white/20 hover:text-white">
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           <input
             type="text"
