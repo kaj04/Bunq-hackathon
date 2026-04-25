@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import Anthropic from "@anthropic-ai/sdk"
 import type { ApiResponse, Receipt } from "@/types"
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const client = new Anthropic({ apiKey: process.env.APP_CLAUDE_KEY ?? process.env.ANTHROPIC_API_KEY })
 
 const PROMPT = `You are an expert OCR system for restaurant receipts.
 Extract the receipt data and return ONLY valid JSON, no markdown, no extra text.

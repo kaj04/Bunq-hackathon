@@ -35,11 +35,13 @@ export interface Group {
 export interface ExpenseItem {
   name: string
   price: number
+  quantity?: number
 }
 
 export interface ReceiptData {
   items: ExpenseItem[]
   total: number
+  currency?: string
 }
 
 export interface SplitResult {

@@ -17,6 +17,9 @@ DATE CONTEXT:
   "oggi" → days=1, "ieri" → days=2, "2/3 giorni fa" → days=4, "settimana scorsa" → days=10.
 - If search returns multiple payments across different dates, only consider those matching the intended date.
 
+RECEIPT MODE: If the transcript starts with [RICEVUTA], the payment is already known (scanned receipt).
+Skip step 1 entirely. Go directly to step 2 using the names mentioned in the user description.
+
 WORKFLOW — follow this order strictly:
 1. Call search_recent_payments using relevant keywords AND the correct 'days' window.
    - If found=false: retry once with double the days, then tell the user nothing was found.

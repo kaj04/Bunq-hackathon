@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { Receipt, SplitResult } from '@/types'
+import type { Receipt, SplitProposal, AgentResponse } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -535,30 +535,30 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
   addLog: (msg: string) => void
   refreshData: () => void
 }) {
-  const [mode, setMode] = useState<'confirm'>('confirm')
-  const [listening, setListening] = useState(false)
-  const [transcript, setTranscript] = useState('')
+  type Step = 'input' | 'scanning' | 'scanned' | 'reasoning' | 'proposal' | 'done'
+  const [step, setStep] = useState<Step>('input')
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [receipt, setReceipt] = useState<Receipt | null>(null)
-  const [splits, setSplits] = useState<SplitResult[] | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [sending, setSending] = useState(false)
   const [desc, setDesc] = useState('')
-  const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('Restaurant')
+  const [transcript, setTranscript] = useState('')
+  const [agentHistory, setAgentHistory] = useState<any[]>([])
+  const [agentQuestion, setAgentQuestion] = useState('')
+  const [proposal, setProposal] = useState<SplitProposal | null>(null)
+  const [sending, setSending] = useState(false)
+  const [listening, setListening] = useState(false)
   const recognitionRef = useRef<any>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const startVoice = () => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SR) { alert('Use Chrome'); return }
+    if (!SR) { alert('Use Chrome for voice input'); return }
     const r = new SR()
     r.lang = 'it-IT'; r.continuous = false; r.interimResults = true
     r.onresult = (e: any) => setTranscript(Array.from(e.results).map((x: any) => x[0].transcript).join(''))
     r.onend = () => setListening(false)
     recognitionRef.current = r; r.start(); setListening(true)
   }
-
   const stopVoice = () => { recognitionRef.current?.stop(); setListening(false) }
 
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -567,8 +567,8 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
     reader.onload = async (ev) => {
       const dataUrl = ev.target?.result as string
       setImagePreview(dataUrl)
-      setLoading(true)
-      addLog(`Scanning receipt with Claude Vision…`)
+      setStep('scanning')
+      addLog('Scanning receipt with Claude Vision…')
       try {
         const res = await fetch('/api/receipt', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -577,66 +577,94 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
         const data = await res.json()
         if (data.success) {
           setReceipt(data.data)
-          setAmount(data.data.total.toFixed(2))
-          addLog(`✓ Receipt detected: €${data.data.total} (${data.data.items.length} items)`)
-          setMode('confirm')
+          addLog(`✓ Receipt: €${data.data.total} — ${data.data.items.length} items`)
+          setStep('scanned')
+        } else {
+          addLog(`✗ Scan failed: ${data.error}`)
+          setStep('input')
         }
-      } finally { setLoading(false) }
+      } catch (err) {
+        addLog(`✗ Scan error: ${err}`)
+        setStep('input')
+      }
     }
     reader.readAsDataURL(file)
   }
 
-  const calculateSplit = async () => {
-    setLoading(true)
-    const members = group.members.map(m => m.name)
-    addLog(`Calculating split for ${members.join(', ')}…`)
-    const res = await fetch('/api/split', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        receipt, participants: members,
-        voiceInput: transcript || '',
-      }),
-    })
-    const data = await res.json()
-    if (data.success) { setSplits(data.data); addLog(`✓ Split calculated`) }
-    setLoading(false)
+  const callAgent = async (userMessage: string, history?: any[]) => {
+    setStep('reasoning')
+    try {
+      const res = await fetch('/api/agent', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: userMessage, history }),
+      })
+      const data: AgentResponse = await res.json()
+      if (data.state === 'proposal') {
+        setProposal(data.proposal)
+        setStep('proposal')
+      } else if (data.state === 'needs_input') {
+        setAgentQuestion(data.question)
+        setAgentHistory(data.history)
+        setTranscript('')
+        setStep('scanned')
+      } else {
+        addLog(`✗ Agent: ${(data as any).error}`)
+        setStep('scanned')
+      }
+    } catch (err) {
+      addLog(`✗ Error: ${err}`)
+      setStep('scanned')
+    }
+  }
+
+  const handleSplit = () => {
+    if (!receipt || !transcript.trim()) return
+    addLog('Asking AI to compute split…')
+    const itemList = receipt.items
+      .map(i => `- ${i.name} ×${i.quantity} €${(i.price * i.quantity).toFixed(2)}`)
+      .join('\n')
+    const msg = `[RICEVUTA]\nArticoli:\n${itemList}\nTotale: €${receipt.total.toFixed(2)}\n\n${transcript}`
+    callAgent(msg)
+  }
+
+  const handleFollowUp = () => {
+    if (!transcript.trim()) return
+    callAgent(transcript, agentHistory)
   }
 
   const sendRequests = async () => {
-    if (!splits) return
+    if (!proposal) return
     setSending(true)
-    const totalAmt = parseFloat(amount) || (receipt?.total ?? 0)
-    addLog(`Sending ${splits.length} payment requests via Bunq…`)
-    const res = await fetch('/api/bunq/split-group', {
+    addLog(`Sending ${proposal.splits.length} payment requests via Bunq…`)
+    const requests = proposal.splits.map(s => ({
+      recipientAlias: s.participant.bunqAlias ?? `${s.participant.name.toLowerCase()}@sandbox.com`,
+      amount: s.amount,
+      currency: proposal.currency,
+      description: desc || proposal.paymentDescription,
+    }))
+    const res = await fetch('/api/bunq/request-batch', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        description: desc || receipt?.items.map(i => i.name).join(', ') || 'Group expense',
-        totalAmount: totalAmt,
-        members: splits.map(s => ({
-          name: s.participant.name,
-          alias: group.members.find(m => m.name === s.participant.name)?.alias ?? `${s.participant.name.toLowerCase()}@sandbox.com`,
-          amount: s.amount,
-        })),
-      }),
+      body: JSON.stringify({ requests }),
     })
     const data = await res.json()
     if (data.success) {
-      addLog(`✓ Payment requests sent to ${splits.length} people`)
+      addLog(`✓ Sent to ${proposal.splits.length} people`)
       onAdd({
         id: Date.now().toString(),
-        description: desc || 'Group expense',
-        amount: totalAmt,
-        paidBy: 'Francesco',
+        description: desc || proposal.paymentDescription,
+        amount: proposal.total,
+        paidBy: 'Me',
         category,
         date: new Date().toISOString().slice(0, 10),
         imageUrl: imagePreview ?? undefined,
-        splits: splits ? splits.map(s => ({ name: s.participant.name, amount: s.amount })) : undefined
+        splits: proposal.splits.map(s => ({ name: s.participant.name, amount: s.amount })),
       })
+      setStep('done')
       await refreshData()
     } else {
       addLog(`✗ Error: ${data.error}`)
+      setSending(false)
     }
-    setSending(false)
   }
 
   return (
@@ -647,81 +675,141 @@ function AddExpenseModal({ group, onClose, onAdd, addLog, refreshData }: {
           <button onClick={onClose} className="text-gray-400 text-2xl">×</button>
         </div>
 
-        <div className="space-y-4">
-          <input value={desc} onChange={e => setDesc(e.target.value)}
-            placeholder="Title (e.g. Dinner in Roma)"
-            className="w-full bg-[#0d0d0d] text-white rounded-2xl px-5 py-4 text-sm outline-none border border-white/10 focus:border-[#7c3aed] transition" />
+        {/* Step: input — photo upload */}
+        {step === 'input' && (
+          <div className="space-y-4">
+            <input value={desc} onChange={e => setDesc(e.target.value)}
+              placeholder="Title (e.g. Dinner in Roma)"
+              className="w-full bg-[#0d0d0d] text-white rounded-2xl px-5 py-4 text-sm outline-none border border-white/10 focus:border-[#7c3aed] transition" />
 
-          <div className="grid grid-cols-2 gap-3">
-             <div onClick={() => fileRef.current?.click()}
-                className={`relative h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition ${imagePreview ? 'border-[#7c3aed]' : 'border-gray-800 hover:border-gray-500'}`}>
-                {loading && !receipt ? (
-                  <div className="absolute inset-0 bg-black/60 rounded-xl flex flex-col items-center justify-center z-10">
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mb-1" />
-                    <p className="text-[8px] text-white uppercase font-bold">Scanning...</p>
-                  </div>
-                ) : null}
-                {imagePreview ? (
-                  <img src={imagePreview} className="w-full h-full object-cover rounded-xl" />
-                ) : (
-                  <>
-                    <p className="text-3xl mb-1">📷</p>
-                    <p className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Add Photo</p>
-                  </>
-                )}
-             </div>
-
-             <div className="grid grid-rows-2 gap-2">
-                <div className="bg-[#0d0d0d] rounded-2xl p-3 border border-white/10 flex flex-col justify-center">
-                  <p className="text-gray-500 text-[8px] font-bold uppercase mb-1">Total Amount</p>
-                  <input value={amount} onChange={e => setAmount(e.target.value)}
-                    placeholder="€0.00" type="number" step="0.01"
-                    className="bg-transparent text-white font-bold text-lg outline-none w-full" />
-                </div>
-                <div className="bg-[#0d0d0d] rounded-2xl p-3 border border-white/10 flex items-center justify-between">
-                   <p className="text-gray-500 text-[8px] font-bold uppercase tracking-wider">Type</p>
-                   <select value={category} onChange={e => setCategory(e.target.value)}
-                     className="bg-transparent text-white text-xs outline-none border-none cursor-pointer font-bold">
-                     {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{CATEGORIES[c].emoji} {c}</option>)}
-                   </select>
-                </div>
-             </div>
-          </div>
-
-          <div className="relative">
-             <textarea value={transcript} onChange={e => setTranscript(e.target.value)}
-                placeholder="AI instructions (Who paid? Extra splits?)"
-                className="w-full bg-[#0d0d0d] text-white rounded-2xl px-5 py-4 text-sm outline-none border border-white/10 focus:border-[#7c3aed] transition min-h-[90px] pr-12 pt-4" />
-             <button onClick={listening ? stopVoice : startVoice}
-                className={`absolute top-4 right-4 w-9 h-9 rounded-full flex items-center justify-center transition-all ${listening ? 'bg-red-500 animate-pulse' : 'bg-white/5 hover:bg-white/10'}`}>
-                {listening ? '⏹' : '🎤'}
-             </button>
-          </div>
-
-          {!splits ? (
-            <button onClick={calculateSplit} disabled={loading || !desc}
-              className="w-full bg-[#7c3aed] text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-purple-500/30 disabled:opacity-40 transition active:scale-[0.98]">
-              {loading ? 'Processing...' : 'Magic AI Split ✨'}
-            </button>
-          ) : (
-            <div className="space-y-3 pt-1 animate-in fade-in slide-in-from-bottom-2">
-              <div className="bg-[#0d0d0d] rounded-2xl p-4 space-y-2 border border-white/5">
-                {splits.map((s, i) => (
-                  <div key={i} className="flex justify-between items-center py-1">
-                    <span className="text-gray-300 text-sm">{s.participant.name}</span>
-                    <span className="text-green-400 font-bold">€{s.amount.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={sendRequests} disabled={sending}
-                className="w-full bg-[#00a86b] text-white py-4 font-bold rounded-2xl shadow-xl shadow-green-500/20 active:scale-[0.98] transition">
-                {sending ? 'Sending Requests...' : 'Confirm and Split'}
-              </button>
-              <button onClick={() => setSplits(null)} className="w-full text-gray-500 text-[9px] font-bold uppercase tracking-widest py-1">Reset Calculation</button>
+            <div onClick={() => fileRef.current?.click()}
+              className="h-36 rounded-3xl border-2 border-dashed border-gray-700 hover:border-purple-600 flex flex-col items-center justify-center cursor-pointer transition gap-2">
+              <p className="text-4xl">📷</p>
+              <p className="text-gray-300 text-sm font-medium">Upload Receipt</p>
+              <p className="text-gray-600 text-xs">Claude Vision will read the items</p>
             </div>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
-        </div>
+
+            <div className="flex gap-2">
+              {Object.keys(CATEGORIES).map(c => (
+                <button key={c} onClick={() => setCategory(c)} title={c}
+                  className={`flex-1 rounded-xl py-3 text-center text-xl transition ${category === c ? 'bg-white/15 ring-1 ring-white/30' : 'bg-[#0d0d0d]'}`}>
+                  {CATEGORIES[c].emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Step: scanning */}
+        {step === 'scanning' && (
+          <div className="flex flex-col items-center py-10 gap-4">
+            {imagePreview && <img src={imagePreview} className="w-36 h-36 object-cover rounded-2xl opacity-60" />}
+            <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-white font-medium">Analyzing receipt…</p>
+            <p className="text-gray-500 text-sm">Claude Vision is reading the items</p>
+          </div>
+        )}
+
+        {/* Step: scanned — show items JSON + ask how to split */}
+        {step === 'scanned' && receipt && (
+          <div className="space-y-4">
+            <div className="bg-[#0d0d0d] rounded-2xl p-4 border border-green-900/40">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-green-400 text-sm font-bold">✓ Bill analyzed!</span>
+                <span className="text-gray-500 text-xs">{receipt.items.length} items · {receipt.currency}</span>
+              </div>
+              {receipt.items.map((item, i) => (
+                <div key={i} className="flex justify-between text-sm py-1">
+                  <span className="text-gray-300">{item.name} ×{item.quantity}</span>
+                  <span className="text-white font-medium">€{(item.price * item.quantity).toFixed(2)}</span>
+                </div>
+              ))}
+              <div className="border-t border-gray-800 mt-2 pt-2 flex justify-between font-bold">
+                <span className="text-gray-400">Total</span>
+                <span className="text-white">€{receipt.total.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {agentQuestion && (
+              <div className="bg-[#0d0d0d] rounded-2xl px-4 py-3 border border-purple-900/40">
+                <p className="text-purple-300 text-[10px] font-bold uppercase tracking-wider mb-1">AI</p>
+                <p className="text-gray-300 text-sm">{agentQuestion}</p>
+              </div>
+            )}
+
+            <div>
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                {agentQuestion ? 'Your reply' : 'Come vuoi dividerlo?'}
+              </p>
+              <div className="relative">
+                <textarea value={transcript} onChange={e => setTranscript(e.target.value)}
+                  placeholder="E.g. &quot;Ho preso la margherita e una coca, Filippo ha preso la boscaiola e l'acqua&quot;"
+                  className="w-full bg-[#0d0d0d] text-white rounded-2xl px-4 py-3 pr-12 text-sm outline-none border border-white/10 focus:border-[#7c3aed] transition min-h-[90px]" />
+                <button onClick={listening ? stopVoice : startVoice}
+                  className={`absolute top-3 right-3 w-9 h-9 rounded-full flex items-center justify-center transition-all ${listening ? 'bg-red-500 animate-pulse' : 'bg-white/5 hover:bg-white/10'}`}>
+                  {listening ? '⏹' : '🎤'}
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={agentQuestion ? handleFollowUp : handleSplit}
+              disabled={!transcript.trim()}
+              className="w-full bg-[#7c3aed] text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-purple-500/30 disabled:opacity-40 transition active:scale-[0.98]">
+              Split ✨
+            </button>
+          </div>
+        )}
+
+        {/* Step: reasoning */}
+        {step === 'reasoning' && (
+          <div className="flex flex-col items-center py-10 gap-4">
+            <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-white font-medium">Computing split…</p>
+            <p className="text-gray-500 text-sm">Matching contacts and calculating amounts</p>
+          </div>
+        )}
+
+        {/* Step: proposal */}
+        {step === 'proposal' && proposal && (
+          <div className="space-y-4">
+            <div className="bg-[#0d0d0d] rounded-2xl p-4 border border-green-900/40">
+              <p className="text-gray-500 text-[10px] font-bold uppercase tracking-wider mb-2">Split proposal</p>
+              <p className="text-white font-medium text-sm mb-3">{proposal.paymentDescription} · €{proposal.total.toFixed(2)}</p>
+              {proposal.splits.map((s, i) => (
+                <div key={i} className="flex justify-between items-center py-2 border-t border-gray-800 first:border-0">
+                  <div>
+                    <span className="text-gray-200 text-sm font-medium">{s.participant.name}</span>
+                    <span className="text-gray-600 text-xs ml-2">{s.participant.bunqAlias}</span>
+                  </div>
+                  <span className="text-green-400 font-bold">€{s.amount.toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+
+            <input value={desc} onChange={e => setDesc(e.target.value)}
+              placeholder="Title (optional)"
+              className="w-full bg-[#0d0d0d] text-white rounded-2xl px-4 py-3 text-sm outline-none border border-white/10" />
+
+            <button onClick={sendRequests} disabled={sending}
+              className="w-full bg-[#00a86b] text-white py-4 font-bold rounded-2xl shadow-xl shadow-green-500/20 active:scale-[0.98] transition">
+              {sending ? 'Sending…' : `Confirm & Send ${proposal.splits.length} requests`}
+            </button>
+            <button onClick={() => setStep('scanned')} className="w-full text-gray-500 text-xs font-bold uppercase tracking-widest py-1">Edit</button>
+          </div>
+        )}
+
+        {/* Step: done */}
+        {step === 'done' && (
+          <div className="flex flex-col items-center py-12 gap-4">
+            <p className="text-5xl">✅</p>
+            <p className="text-white text-xl font-bold">All done!</p>
+            <p className="text-gray-400 text-sm">Payment requests sent successfully</p>
+            <button onClick={onClose} className="mt-4 bg-[#00a86b] text-white px-8 py-3 rounded-2xl font-semibold">Close</button>
+          </div>
+        )}
+
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhoto} />
       </div>
     </div>
   )

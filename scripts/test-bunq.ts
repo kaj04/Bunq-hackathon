@@ -12,7 +12,7 @@ config({ path: resolve(process.cwd(), '.env.local') })
 // Assicuriamoci che BUNQ_MOCK sia disabilitato
 delete process.env.BUNQ_MOCK
 
-import { initBunq, getBunqSession, createPaymentRequestBatch } from '../lib/bunq/client'
+import { initBunq, getBunqSession, createGroupSplit } from '../lib/bunq/client'
 import { searchRecentPayments } from '../lib/bunq/payments'
 
 async function main() {
@@ -58,7 +58,7 @@ async function main() {
   // ── 3. Test RequestInquiryBatch ─────────────────────────────────────────
   console.log('\n3. Test RequestInquiryBatch (€0.01 x2 verso sandbox users)...')
   try {
-    const result = await createPaymentRequestBatch([
+    const result = await createGroupSplit([
       {
         recipientAlias: 'sugardaddy@bunq.com',  // Bunq sandbox magic alias — sempre disponibile
         amount: 0.01,
