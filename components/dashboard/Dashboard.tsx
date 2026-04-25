@@ -52,13 +52,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
 
       {/* Top section */}
       <div className="flex justify-between items-start gap-8">
-        <div className="bg-card rounded-[24px] p-6 w-[540px] border border-zinc-800 relative overflow-hidden group shadow-xl">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-bunq opacity-5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:opacity-10 transition-opacity" />
-          <p className="text-zinc-500 text-sm font-medium mb-1">Total Balance</p>
-          <h1 className="text-5xl font-bold mb-8 tracking-tight italic">€ {balance}</h1>
-          <div className="flex items-center gap-4">
-            <div className="bg-zinc-800/50 px-4 py-1.5 rounded-full text-xs font-mono text-zinc-400 border border-zinc-700/50">MARC· 1234</div>
-            <div className="text-[10px] text-bunq font-bold tracking-[0.2em] uppercase">Mastercard Gold</div>
+        {/* Bunq card */}
+        <div className="w-[540px] h-[200px] rounded-[28px] relative overflow-hidden shadow-2xl shadow-bunq/30 select-none"
+          style={{ background: 'linear-gradient(135deg, #00a86b 0%, #007a4d 50%, #004d31 100%)' }}>
+
+          {/* decorative circles */}
+          <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-white/5" />
+          <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-white/5" />
+          <div className="absolute top-6 right-6 w-24 h-24 rounded-full bg-white/5" />
+
+          {/* bunq wordmark */}
+          <div className="absolute top-6 left-6 text-white font-black text-2xl tracking-[-0.05em]">bunq</div>
+
+          {/* chip SVG */}
+          <svg className="absolute top-6 right-6 opacity-80" width="38" height="30" viewBox="0 0 38 30">
+            <rect width="38" height="30" rx="4" fill="#d4a843" />
+            <rect x="13" y="0" width="12" height="30" fill="#c49b35" />
+            <rect x="0" y="9" width="38" height="12" fill="#c49b35" />
+            <rect x="13" y="9" width="12" height="12" fill="#b8882a" />
+          </svg>
+
+          {/* balance */}
+          <div className="absolute bottom-14 left-6">
+            <p className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Balance</p>
+            <p className="text-white text-4xl font-bold tracking-tight">€ {balance}</p>
+          </div>
+
+          {/* card number + name */}
+          <div className="absolute bottom-5 left-6 right-6 flex items-end justify-between">
+            <p className="text-white/70 text-sm font-mono tracking-[0.15em]">•••• •••• •••• 4829</p>
+            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Francesco</p>
           </div>
         </div>
 
