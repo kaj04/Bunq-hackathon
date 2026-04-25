@@ -294,7 +294,8 @@ export async function getIncomingRequests() {
       amount: req?.amount_inquired?.value,
       currency: req?.amount_inquired?.currency,
       description: req?.description,
-      from: req?.counterparty_alias?.display_name,
+      counterparty: req?.counterparty_alias?.display_name ?? req?.counterparty_alias?.value ?? 'Unknown',
+      from: req?.counterparty_alias?.display_name ?? req?.counterparty_alias?.value ?? 'Unknown',
       status: req?.status,
       date: req?.created,
     }

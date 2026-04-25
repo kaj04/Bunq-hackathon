@@ -8,31 +8,14 @@ import { AddExpenseModal } from '@/components/expenses/AddExpenseModal'
 import { QuickPayModal } from '@/components/payments/QuickPayModal'
 import { Group, GroupExpense, Transaction, PaymentRequest, SplitResult } from '@/types/designer'
 
-// Sandbox users with placeholder aliases — real emails loaded from /api/bunq/members on mount
-const INITIAL_MEMBERS = [
-  { name: 'Francesco', userId: 3628453, alias: '' },
-  { name: 'Giorgio',   userId: 3628489, alias: '' },
-  { name: 'Vaggelis',  userId: 3628490, alias: '' },
-  { name: 'Diego',     userId: 3628491, alias: '' },
-]
-
-const ALL_MEMBERS = [
-  { name: 'Francesco', alias: 'test+04f633e0-a0b9-462f-bb2f-d71d81d7d8ad@bunq.com' },
-  { name: 'Giorgio',   alias: 'test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com' },
-  { name: 'Vaggelis',  alias: 'test+a1223711-bee6-4974-bc54-b3ed8b11f121@bunq.com' },
-  { name: 'Diego',     alias: 'test+0e48be1e-7446-4b25-b0ac-6c16fbb0f38d@bunq.com' },
-]
-
 const INITIAL_GROUPS: Group[] = [
   {
     id: '1', name: 'Weekend Trip', emoji: '✈️', color: '#8b5cf6',
-    members: ALL_MEMBERS,
-    expenses: [], totalSpent: 0, memberCount: 4,
+    members: [], expenses: [], totalSpent: 0, memberCount: 0,
   },
   {
     id: '2', name: 'Dinner Club', emoji: '🍕', color: '#f59e0b',
-    members: ALL_MEMBERS.filter(m => m.name !== 'Vaggelis'),
-    expenses: [], totalSpent: 0, memberCount: 3,
+    members: [], expenses: [], totalSpent: 0, memberCount: 0,
   },
 ]
 
@@ -51,7 +34,7 @@ export const MeditaSplit: React.FC = () => {
       return saved ? JSON.parse(saved) : INITIAL_GROUPS
     } catch { return INITIAL_GROUPS }
   })
-  const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>(INITIAL_MEMBERS)
+  const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>([])
   const [currentUser, setCurrentUser] = useState('Me')
 
   const fetchMembers = useCallback(async () => {
@@ -130,7 +113,7 @@ export const MeditaSplit: React.FC = () => {
   }
 
   const handleCreateGroup = (name: string, emoji: string, color: string, members: { name: string; alias: string }[]) => {
-    const chosenMembers = members.length > 0 ? members : ALL_MEMBERS
+    const chosenMembers = members
     const newGroup: Group = {
       id: Date.now().toString(),
       name, emoji, color,
@@ -219,10 +202,7 @@ export const MeditaSplit: React.FC = () => {
           {activeTab === 'groups' && !selectedGroup && (
             <GroupsGrid
               groups={groups}
-              availableContacts={ALL_MEMBERS.map(m => {
-                const live = memberAliases.find(a => a.name === m.name)
-                return { name: m.name, alias: live?.alias || m.alias }
-              })}
+              availableContacts={memberAliases.map(m => ({ name: m.name, alias: m.alias }))}
               onSelectGroup={setSelectedGroup}
               onCreateGroup={handleCreateGroup}
             />
@@ -232,10 +212,7 @@ export const MeditaSplit: React.FC = () => {
             <GroupChat
               group={selectedGroup}
               onBack={() => setSelectedGroup(null)}
-              availableContacts={ALL_MEMBERS.map(m => {
-                const live = memberAliases.find(a => a.name === m.name)
-                return { name: m.name, alias: live?.alias || m.alias }
-              })}
+              availableContacts={memberAliases.map(m => ({ name: m.name, alias: m.alias }))}
               onUpdateGroup={handleUpdateGroup}
               onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
             />
