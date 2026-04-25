@@ -2,7 +2,7 @@
 
 > **From photo to payment in 10 seconds.** AI-powered bill splitting, backed by real Bunq payment requests.
 
-Built at the Bunq Hackathon by Giorgio, Francesco, Vaggelis & Diego.
+Built at the Bunq Hackathon by Giorgio Maria, Francesco, Vaggelis & Diego.
 
 ---
 
