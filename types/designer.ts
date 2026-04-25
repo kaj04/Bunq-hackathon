@@ -7,6 +7,7 @@ export interface ChatMessage {
 }
 
 export interface Transaction {
+  id?: number
   amount: number
   description: string
   type: 'income' | 'outcome'
@@ -22,14 +23,28 @@ export interface PaymentRequest {
   from: string
 }
 
+export interface GroupMember {
+  name: string
+  alias: string  // email Bunq sandbox
+}
+
+export interface GroupExpense {
+  batchId: number
+  description: string
+  total: number
+  date: string
+  splits: Array<{ name: string; alias: string; amount: number }>
+}
+
 export interface Group {
   id: string
   name: string
   emoji: string
   color: string
-  totalSpent: number
-  memberCount: number
-  members: string[]
+  members: GroupMember[]
+  expenses: GroupExpense[]
+  totalSpent: number   // sum of expenses[].total, updated on each new split
+  memberCount: number  // mirrors members.length
 }
 
 export interface ExpenseItem {

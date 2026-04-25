@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     }))
 
     const data = await createGroupSplit(requests)
-    return NextResponse.json({ success: true, data, totalAmount, memberCount: members.length })
+    const batchId: number = data.batchId ?? 0
+    return NextResponse.json({ success: true, data, batchId, totalAmount, memberCount: members.length })
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 })
   }
