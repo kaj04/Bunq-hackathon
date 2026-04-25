@@ -10,3 +10,5 @@ node_modules/
 meditasplit.zip
 meditasplit_extracted/
 tsconfig.tsbuildinfo
+groups-store.json
+chat-store.json

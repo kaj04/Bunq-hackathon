@@ -5,6 +5,7 @@ import { Group, GroupExpense, ChatMessage, GroupMember } from '@/types/designer'
 
 interface GroupChatProps {
   group: Group
+  currentUser: string
   onBack: () => void
   availableContacts: GroupMember[]
   onUpdateGroup: (updated: Group) => void
@@ -17,8 +18,6 @@ type PendingSplit = {
   total: number
 }
 
-const STORAGE_KEY = (groupId: string) => `meditasplit_chat_${groupId}`
-
 const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
   id: 'welcome',
   sender: 'agent',
@@ -26,17 +25,11 @@ const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
   timestamp: new Date().toISOString(),
 })
 
-export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableContacts, onUpdateGroup, onExpenseAdded }) => {
+export const GroupChat: React.FC<GroupChatProps> = ({ group, currentUser, onBack, availableContacts, onUpdateGroup, onExpenseAdded }) => {
   const [showSettings, setShowSettings] = useState(false)
   const [addName, setAddName] = useState('')
   const [addEmail, setAddEmail] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY(group.id))
-      if (saved) return JSON.parse(saved)
-    } catch { /* ignore */ }
-    return [WELCOME_MESSAGE(group.name)]
-  })
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE(group.name)])
   const [inputText, setInputText] = useState('')
   const [isRecording, setIsRecording] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -45,28 +38,63 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const recognitionRef = useRef<any>(null)
+  const knownIdsRef = useRef<Set<string>>(new Set(['welcome']))
+
+  // Load chat from server on mount + poll every 3s
+  const fetchChat = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/groups/${group.id}/chat`)
+      const data = await res.json()
+      if (!data.success) return
+      const incoming: ChatMessage[] = data.data
+      if (!incoming.length) return
+      setMessages(prev => {
+        const existingIds = new Set(prev.map(m => m.id))
+        const newOnes = incoming.filter(m => !existingIds.has(m.id))
+        return newOnes.length ? [...prev, ...newOnes] : prev
+      })
+      incoming.forEach(m => knownIdsRef.current.add(m.id))
+    } catch { /* ignore */ }
+  }, [group.id])
+
+  useEffect(() => { fetchChat() }, [fetchChat])
+
+  useEffect(() => {
+    const interval = setInterval(fetchChat, 3000)
+    return () => clearInterval(interval)
+  }, [fetchChat])
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
-  useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY(group.id), JSON.stringify(messages)) } catch { /* ignore */ }
-  }, [messages, group.id])
-
-  // Builds a compact text summary of past AI messages for LLM context
   const buildChatContext = (): string | undefined => {
     const agentMessages = messages
       .filter(m => m.sender === 'agent' && m.id !== 'welcome' && !m.text.startsWith('⏳'))
-      .slice(-10) // last 10 AI messages
+      .slice(-10)
     if (!agentMessages.length) return undefined
     return agentMessages
       .map(m => `[${m.timestamp.slice(0, 10)}] ${m.text.slice(0, 300)}`)
       .join('\n---\n')
   }
 
-  const addMessage = (sender: 'user' | 'agent', text: string) => {
-    setMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date().toISOString() }])
+  const addMessage = (sender: 'user' | 'agent', text: string, opts?: { senderName?: string }) => {
+    const msg: ChatMessage = {
+      id: Date.now().toString(),
+      sender,
+      senderName: opts?.senderName ?? (sender === 'user' ? currentUser : 'AI'),
+      text,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, msg])
+    knownIdsRef.current.add(msg.id)
+    // Persist to server (fire-and-forget)
+    fetch(`/api/groups/${group.id}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msg),
+    }).catch(() => {})
+    return msg
   }
 
   const handleSend = async () => {
@@ -385,28 +413,44 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, availableCo
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[70%] flex gap-3 ${msg.sender === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-bold text-[10px] ${
-                msg.sender === 'agent' ? 'bg-bunq text-black' : 'bg-zinc-800 text-zinc-400'
-              }`}>
-                {msg.sender === 'agent' ? 'AI' : 'IO'}
-              </div>
-              <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
-                msg.sender === 'user'
-                  ? 'bg-bunq/10 border border-bunq/20 text-white'
-                  : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
-              }`}>
-                {msg.text}
-                <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
+        {messages.map((msg) => {
+          const isOwnMessage = msg.sender === 'user' && msg.senderName === currentUser
+          const isOtherUser = msg.sender === 'user' && msg.senderName !== currentUser
+          const isAgent = msg.sender === 'agent'
+          // Own messages → right; agent and other users → left
+          const alignRight = isOwnMessage
+          return (
+            <div key={msg.id} className={`flex ${alignRight ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[70%] flex gap-3 ${alignRight ? 'flex-row-reverse' : ''}`}>
+                <div className={`w-8 h-8 rounded-lg flex-shrink-0 flex items-center justify-center font-bold text-[10px] ${
+                  isAgent ? 'bg-bunq text-black' : isOtherUser ? 'bg-violet-700 text-white' : 'bg-zinc-700 text-zinc-300'
+                }`}>
+                  {isAgent ? 'AI' : (msg.senderName?.charAt(0) ?? '?')}
+                </div>
+                <div>
+                  {(isOtherUser || isAgent) && (
+                    <p className="text-[9px] font-bold uppercase tracking-widest mb-1 ml-1 text-zinc-500">
+                      {isAgent ? 'AI Assistant' : msg.senderName}
+                    </p>
+                  )}
+                  <div className={`p-4 rounded-2xl text-sm leading-relaxed whitespace-pre-line ${
+                    isOwnMessage
+                      ? 'bg-bunq/10 border border-bunq/20 text-white'
+                      : isOtherUser
+                        ? 'bg-violet-900/30 border border-violet-700/30 text-white'
+                        : 'bg-zinc-900 border border-zinc-800 text-zinc-300'
+                  }`}>
+                    {msg.text}
+                    <p className="text-[8px] mt-2 opacity-30 font-bold uppercase">
+                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
 
         {/* Confirm button — appare sotto l'ultimo messaggio AI quando c'è un pending split */}
         {pendingSplit && !isProcessing && (
