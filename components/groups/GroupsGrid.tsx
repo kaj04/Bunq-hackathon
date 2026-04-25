@@ -1,26 +1,50 @@
 'use client'
-import React, { useState } from 'react'
-import { Plus, Users, ArrowRight } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { Plus, Users, ArrowRight, Check } from 'lucide-react'
 import { Group } from '@/types/designer'
+
+interface GroupMember { name: string; alias: string }
 
 interface GroupsGridProps {
   groups: Group[]
+  availableContacts: GroupMember[]
   onSelectGroup: (group: Group) => void
-  onCreateGroup: (name: string, emoji: string, color: string) => void
+  onCreateGroup: (name: string, emoji: string, color: string, members: GroupMember[]) => void
 }
 
-export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, onSelectGroup, onCreateGroup }) => {
+export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContacts, onSelectGroup, onCreateGroup }) => {
   const [isCreating, setIsCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newEmoji, setNewEmoji] = useState('🌍')
   const [newColor, setNewColor] = useState('#00a86b')
+  const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set())
+
+  // Pre-select all contacts whenever the list loads or creation opens
+  useEffect(() => {
+    if (isCreating) setSelectedNames(new Set(availableContacts.map(c => c.name)))
+  }, [isCreating, availableContacts])
+
+  const toggleMember = (name: string) => {
+    setSelectedNames(prev => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
+  }
 
   const handleCreate = () => {
-    if (newName.trim()) {
-      onCreateGroup(newName, newEmoji, newColor)
-      setNewName('')
-      setIsCreating(false)
-    }
+    if (!newName.trim()) return
+    const members = availableContacts.filter(c => selectedNames.has(c.name))
+    onCreateGroup(newName.trim(), newEmoji, newColor, members)
+    setNewName('')
+    setNewEmoji('🌍')
+    setNewColor('#00a86b')
+    setIsCreating(false)
+  }
+
+  const handleCancel = () => {
+    setIsCreating(false)
+    setNewName('')
   }
 
   return (
@@ -38,7 +62,8 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, onSelectGroup, o
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {isCreating && (
           <div className="bg-card rounded-[32px] p-6 border-2 border-bunq flex flex-col gap-4 shadow-2xl shadow-bunq/10">
-            <div className="grid grid-cols-4 gap-2 mb-2">
+            {/* Emoji picker */}
+            <div className="grid grid-cols-4 gap-2">
               {['🍕','🍔','🍺','🚗','✈️','🏨','🎟️','🛒'].map(e => (
                 <button key={e} onClick={() => setNewEmoji(e)}
                   className={`text-2xl p-2 rounded-xl transition-all ${newEmoji === e ? 'bg-bunq/20 border border-bunq/50' : 'hover:bg-white/5'}`}>
@@ -46,11 +71,16 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, onSelectGroup, o
                 </button>
               ))}
             </div>
+
+            {/* Name */}
             <input
-              autoFocus type="text" placeholder="Group Name" value={newName}
+              autoFocus type="text" placeholder="Group name" value={newName}
               onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
               className="bg-white/5 border border-white/10 rounded-2xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-bunq"
             />
+
+            {/* Color */}
             <div className="flex gap-2">
               {['#00a86b','#8b5cf6','#f59e0b','#3b82f6','#ef4444'].map(c => (
                 <button key={c} onClick={() => setNewColor(c)}
@@ -58,9 +88,42 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, onSelectGroup, o
                   style={{ backgroundColor: c }} />
               ))}
             </div>
-            <div className="flex gap-2 mt-2">
-              <button onClick={() => setIsCreating(false)} className="btn-secondary flex-1 !py-2">Cancel</button>
-              <button onClick={handleCreate} className="btn-primary flex-1 !py-2">Create</button>
+
+            {/* Member picker */}
+            {availableContacts.length > 0 && (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-3">Members</p>
+                <div className="flex flex-wrap gap-2">
+                  {availableContacts.map(contact => {
+                    const selected = selectedNames.has(contact.name)
+                    return (
+                      <button
+                        key={contact.name}
+                        onClick={() => toggleMember(contact.name)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                          selected
+                            ? 'bg-bunq/20 border-bunq/60 text-white'
+                            : 'bg-white/5 border-white/10 text-white/40 hover:text-white/70'
+                        }`}
+                      >
+                        <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${selected ? 'bg-bunq text-white' : 'bg-white/10 text-white/50'}`}>
+                          {selected ? <Check size={10} /> : contact.name.charAt(0)}
+                        </span>
+                        {contact.name}
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-[10px] text-white/20 mt-2">
+                  {selectedNames.size} of {availableContacts.length} selected
+                </p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-2 mt-1">
+              <button onClick={handleCancel} className="btn-secondary flex-1 !py-2">Cancel</button>
+              <button onClick={handleCreate} disabled={!newName.trim()} className="btn-primary flex-1 !py-2 disabled:opacity-40 disabled:cursor-not-allowed">Create</button>
             </div>
           </div>
         )}
@@ -93,6 +156,11 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, onSelectGroup, o
                       {m.name.charAt(0)}
                     </div>
                   ))}
+                  {group.members.length > 3 && (
+                    <div className="w-6 h-6 rounded-full border border-card bg-zinc-800 flex items-center justify-center text-[8px] font-bold text-zinc-400">
+                      +{group.members.length - 3}
+                    </div>
+                  )}
                 </div>
                 <ArrowRight size={18} className="text-zinc-700 group-hover:text-bunq group-hover:translate-x-1 transition-all" />
               </div>

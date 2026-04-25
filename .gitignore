@@ -2,9 +2,10 @@
 .env
 node_modules/
 .next/
-.bunq-session.json
-.bunq-device.json
-.bunq-sugar.json
+.bunq-session*.json
+.bunq-device*.json
+.bunq-sugar*.json
+.bunq-accounts.json
 meditasplit.zip
 meditasplit_extracted/
 tsconfig.tsbuildinfo

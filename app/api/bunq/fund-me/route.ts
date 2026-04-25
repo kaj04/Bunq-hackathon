@@ -6,8 +6,9 @@ import fs from 'fs'
 import path from 'path'
 
 const BASE = 'https://public-api.sandbox.bunq.com/v1'
-const DEVICE_FILE = path.join(process.cwd(), '.bunq-device.json')
-const SESSION_FILE = path.join(process.cwd(), '.bunq-session.json')
+const _suffix = process.env.BUNQ_USER_NAME ? `-${process.env.BUNQ_USER_NAME}` : ''
+const DEVICE_FILE = path.join(process.cwd(), `.bunq-device${_suffix}.json`)
+const SESSION_FILE = path.join(process.cwd(), `.bunq-session${_suffix}.json`)
 
 function sign(body: string, privateKey: string) {
   return crypto.createSign('SHA256').update(body).sign(privateKey, 'base64')

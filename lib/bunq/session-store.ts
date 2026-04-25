@@ -1,9 +1,10 @@
 import fs from 'fs'
 import path from 'path'
 
-const DEVICE_STORE = path.join(process.cwd(), '.bunq-device.json')
-const SESSION_STORE = path.join(process.cwd(), '.bunq-session.json')
-const SUGAR_STORE = path.join(process.cwd(), '.bunq-sugar.json')
+const _suffix = process.env.BUNQ_USER_NAME ? `-${process.env.BUNQ_USER_NAME}` : ''
+const DEVICE_STORE = path.join(process.cwd(), `.bunq-device${_suffix}.json`)
+const SESSION_STORE = path.join(process.cwd(), `.bunq-session${_suffix}.json`)
+const SUGAR_STORE = path.join(process.cwd(), `.bunq-sugar${_suffix}.json`)
 
 const DEVICE_TTL_MS = 30 * 24 * 60 * 60 * 1000  // 30 giorni
 const SESSION_TTL_MS = 55 * 60 * 1000             // 55 minuti

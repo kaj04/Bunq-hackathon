@@ -44,12 +44,17 @@ export const MeditaSplit: React.FC = () => {
   const [requests, setRequests] = useState<PaymentRequest[]>([])
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS)
   const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>(INITIAL_MEMBERS)
+  const [currentUser, setCurrentUser] = useState('Me')
 
   const fetchMembers = useCallback(async () => {
     try {
-      const res = await fetch('/api/bunq/members')
-      const data = await res.json()
-      if (data.success) setMemberAliases(data.data)
+      const [membersRes, meRes] = await Promise.all([
+        fetch('/api/bunq/members'),
+        fetch('/api/bunq/me'),
+      ])
+      const [membersData, meData] = await Promise.all([membersRes.json(), meRes.json()])
+      if (membersData.success) setMemberAliases(membersData.data)
+      if (meData.success) setCurrentUser(meData.data.name)
     } catch { /* keep placeholders */ }
   }, [])
 
@@ -111,13 +116,14 @@ export const MeditaSplit: React.FC = () => {
     }
   }
 
-  const handleCreateGroup = (name: string, emoji: string, color: string) => {
+  const handleCreateGroup = (name: string, emoji: string, color: string, members: { name: string; alias: string }[]) => {
+    const chosenMembers = members.length > 0 ? members : ALL_MEMBERS
     const newGroup: Group = {
       id: Date.now().toString(),
       name, emoji, color,
-      members: ALL_MEMBERS,
+      members: chosenMembers,
       expenses: [],
-      memberCount: ALL_MEMBERS.length,
+      memberCount: chosenMembers.length,
       totalSpent: 0,
     }
     setGroups(prev => [...prev, newGroup])
@@ -172,10 +178,10 @@ export const MeditaSplit: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background text-white flex">
-      <Sidebar activeTab={activeTab} setActiveTab={(tab) => { setActiveTab(tab); setSelectedGroup(null) }} />
+      <Sidebar activeTab={activeTab} setActiveTab={(tab) => { setActiveTab(tab); setSelectedGroup(null) }} userName={currentUser} />
 
       <div className="flex-1 flex flex-col">
-        <TopBar />
+        <TopBar userName={currentUser} />
 
         <main className="flex-1">
           {activeTab === 'home' && (
@@ -192,6 +198,10 @@ export const MeditaSplit: React.FC = () => {
           {activeTab === 'groups' && !selectedGroup && (
             <GroupsGrid
               groups={groups}
+              availableContacts={ALL_MEMBERS.map(m => {
+                const live = memberAliases.find(a => a.name === m.name)
+                return { name: m.name, alias: live?.alias || m.alias }
+              })}
               onSelectGroup={setSelectedGroup}
               onCreateGroup={handleCreateGroup}
             />

@@ -344,10 +344,10 @@ export async function resolveMemberAliases(): Promise<{ name: string; userId: nu
 }
 
 export const SANDBOX_USERS = [
-  { name: 'Francesco', userId: 3628872, alias: 'test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com' },
-  { name: 'Giorgio',   userId: 3628489, alias: 'giorgio@sandbox.com' },
-  { name: 'Vaggelis',  userId: 3628490, alias: 'vaggelis@sandbox.com' },
-  { name: 'Diego',     userId: 3628491, alias: 'diego@sandbox.com' },
+  { name: 'Francesco', userId: 3629040, alias: 'test+04f633e0-a0b9-462f-bb2f-d71d81d7d8ad@bunq.com' },
+  { name: 'Giorgio', userId: 3629030, alias: 'test+708be9a9-dcde-4a0a-95c2-d485b72850a4@bunq.com' },
+  { name: 'Vaggelis', userId: 3629028, alias: 'test+a1223711-bee6-4974-bc54-b3ed8b11f121@bunq.com' },
+  { name: 'Diego',     userId: 3629045, alias: 'test+0e48be1e-7446-4b25-b0ac-6c16fbb0f38d@bunq.com' },
 ]
 
 // ─── Mock data ────────────────────────────────────────────────────────────────

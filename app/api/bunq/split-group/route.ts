@@ -24,6 +24,7 @@ export async function POST(req: NextRequest) {
     const batchId: number = data.batchId ?? 0
     return NextResponse.json({ success: true, data, batchId, totalAmount, memberCount: members.length })
   } catch (err) {
+    console.error('[/api/bunq/split-group] error:', err)
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 })
   }
 }

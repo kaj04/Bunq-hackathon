@@ -5,8 +5,9 @@ import { acceptPaymentRequest } from '@/lib/bunq/client'
 
 export async function POST(req: NextRequest) {
   try {
-    const { requestResponseId } = await req.json()
-    const data = await acceptPaymentRequest(Number(requestResponseId))
+    const body = await req.json()
+    const id = body.requestResponseId ?? body.requestId
+    const data = await acceptPaymentRequest(Number(id))
     return NextResponse.json({ success: true, data })
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 })

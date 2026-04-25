@@ -5,9 +5,10 @@ import { Home, Users, Search } from 'lucide-react'
 interface SidebarProps {
   activeTab: string
   setActiveTab: (tab: string) => void
+  userName?: string
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, userName = 'Me' }) => {
   const menuItems = [
     { id: 'home', icon: Home, label: 'Home' },
     { id: 'groups', icon: Users, label: 'Groups' },
@@ -36,9 +37,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
 
       <div className="mt-auto pt-6">
         <div className="flex items-center gap-2 pr-2 px-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10" />
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10 flex items-center justify-center text-xs font-bold text-white">
+            {userName.charAt(0)}
+          </div>
           <div className="flex flex-col">
-            <span className="text-xs font-bold text-zinc-300">Francesco C.</span>
+            <span className="text-xs font-bold text-zinc-300">{userName}</span>
             <span className="text-[10px] font-bold text-bunq/60 uppercase">Sandbox</span>
           </div>
         </div>
@@ -47,7 +50,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
   )
 }
 
-export const TopBar: React.FC = () => (
+interface TopBarProps {
+  userName?: string
+}
+
+export const TopBar: React.FC<TopBarProps> = ({ userName = 'Me' }) => (
   <div className="h-16 border-b border-border-subtle flex items-center justify-between px-8 bg-background/50 backdrop-blur-xl sticky top-0 z-10 ml-64">
     <div className="relative w-80">
       <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600" size={16} />
@@ -58,8 +65,10 @@ export const TopBar: React.FC = () => (
       />
     </div>
     <div className="flex items-center gap-2">
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10" />
-      <span className="text-xs font-bold text-zinc-400">Francesco C.</span>
+      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 border border-white/10 flex items-center justify-center text-xs font-bold text-white">
+        {userName.charAt(0)}
+      </div>
+      <span className="text-xs font-bold text-zinc-400">{userName}</span>
     </div>
   </div>
 )
