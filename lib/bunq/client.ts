@@ -4,7 +4,7 @@ import {
   loadDevice, saveDevice,
   loadSession, saveSession, clearSession,
 } from './session-store'
-import { MOCK_CONTACTS } from './mock-data'
+import { MOCK_CONTACTS, MOCK_PAYMENTS } from './mock-data'
 import { isMock } from '@/lib/mock-flag'
 import type { BunqContact, PaymentRequest } from '@/types'
 
@@ -170,14 +170,28 @@ export async function initBunq() {
 /** Pagamento diretto (simulazione spesa personale) — appare nelle transazioni */
 export async function makePayment(amount: number, description: string) {
   if (isMock()) {
+    const now = new Date().toISOString()
+    const id = Date.now()
     MOCK_TRANSACTIONS.unshift({
-      id: Date.now(),
+      id,
       amount: `-${amount.toFixed(2)}`,
       currency: 'EUR',
       description,
       type: 'out',
       counterparty: 'sugardaddy@bunq.com',
       date: new Date().toISOString().slice(0, 10),
+    })
+    MOCK_PAYMENTS.unshift({
+      id,
+      created: now,
+      updated: now,
+      monetary_account_id: SANDBOX_USERS.find(u => u.name === 'Giorgio')?.userId ?? 0,
+      amount: { value: amount.toFixed(2), currency: 'EUR' },
+      alias: { display_name: 'Giorgio', iban: 'NL88BUNQ2025042600001', type: 'IBAN' },
+      counterparty_alias: { display_name: 'sugardaddy@bunq.com', type: 'EMAIL' },
+      description,
+      type: 'PAYMENT',
+      balance_after_mutation: { value: '0.00', currency: 'EUR' },
     })
     console.log(`[MOCK] Payment €${amount}: ${description}`)
     return { mock: true }
@@ -207,14 +221,30 @@ export async function createGroupSplit(requests: PaymentRequest[]) {
   if (isMock()) {
     const total = requests.reduce((s, r) => s + r.amount, 0)
     const batchId = Date.now()
+    const now = new Date().toISOString()
+    const description = requests[0]?.description ?? 'Group split'
+    const counterpartyNames = requests.map(r => r.recipientAlias.split('@')[0]).join(', ')
     MOCK_TRANSACTIONS.unshift({
       id: batchId,
       amount: `-${total.toFixed(2)}`,
       currency: 'EUR',
-      description: requests[0]?.description ?? 'Group split',
+      description,
       type: 'out',
-      counterparty: requests.map(r => r.recipientAlias.split('@')[0]).join(', '),
+      counterparty: counterpartyNames,
       date: new Date().toISOString().slice(0, 10),
+    })
+    // Also register in MOCK_PAYMENTS so the split agent can find it via search_payments
+    MOCK_PAYMENTS.unshift({
+      id: batchId,
+      created: now,
+      updated: now,
+      monetary_account_id: SANDBOX_USERS.find(u => u.name === 'Giorgio')?.userId ?? 0,
+      amount: { value: total.toFixed(2), currency: 'EUR' },
+      alias: { display_name: 'Giorgio', iban: 'NL88BUNQ2025042600001', type: 'IBAN' },
+      counterparty_alias: { display_name: counterpartyNames, type: 'EMAIL' },
+      description,
+      type: 'PAYMENT',
+      balance_after_mutation: { value: '0.00', currency: 'EUR' },
     })
     console.log(`[MOCK] Group split: ${requests.map(r => `€${r.amount}→${r.recipientAlias}`).join(', ')}`)
     return { mock: true, batchId }
@@ -335,16 +365,41 @@ export async function getSandboxUserEmail(userId: number): Promise<string | null
   }
 }
 
-/** Resolve email aliases for all known sandbox members */
+/** Resolve email aliases — reads from bunq-members.json (shared) overriding with bunq-accounts.json (local) */
 export async function resolveMemberAliases(): Promise<{ name: string; userId: number; alias: string }[]> {
-  if (isMock()) return SANDBOX_USERS
-  const results = await Promise.all(
-    SANDBOX_USERS.map(async u => {
-      const email = await getSandboxUserEmail(u.userId)
-      return { ...u, alias: email ?? u.alias }
-    })
-  )
-  return results
+  const fs = await import('fs')
+  const path = await import('path')
+
+  // Load shared public registry (names + emails, committable)
+  const membersPath = path.join(process.cwd(), 'bunq-members.json')
+  let members: { name: string; userId: number; alias: string }[] = [...SANDBOX_USERS]
+  if (fs.existsSync(membersPath)) {
+    try {
+      const fromFile = JSON.parse(fs.readFileSync(membersPath, 'utf8')) as typeof members
+      // Merge: file entries override hardcoded ones
+      for (const entry of fromFile) {
+        const idx = members.findIndex(m => m.name.toLowerCase() === entry.name.toLowerCase())
+        if (idx >= 0) members[idx] = entry
+        else members.push(entry)
+      }
+    } catch { /* keep defaults */ }
+  }
+
+  // Also override with local .bunq-accounts.json (highest priority — own machine)
+  const accountsPath = path.join(process.cwd(), '.bunq-accounts.json')
+  if (fs.existsSync(accountsPath)) {
+    try {
+      const accounts = JSON.parse(fs.readFileSync(accountsPath, 'utf8')) as Record<string, { email: string; userId: number }>
+      for (const [name, acc] of Object.entries(accounts)) {
+        if (!acc.email) continue
+        const idx = members.findIndex(m => m.name.toLowerCase() === name.toLowerCase())
+        if (idx >= 0) members[idx] = { ...members[idx], userId: acc.userId, alias: acc.email }
+        else members.push({ name, userId: acc.userId, alias: acc.email })
+      }
+    } catch { /* keep defaults */ }
+  }
+
+  return members
 }
 
 export const SANDBOX_USERS = [
@@ -356,16 +411,46 @@ export const SANDBOX_USERS = [
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const MOCK_TRANSACTIONS: { id: number; amount: string; currency: string; description: string; type: string; counterparty: string; date: string }[] = [
-  { id: 1, amount: '-25.50', currency: 'EUR', description: 'Cena da Mario - pizza',         type: 'out', counterparty: 'Giorgio',   date: '2026-04-24' },
-  { id: 2, amount: '+18.00', currency: 'EUR', description: 'Cena da Mario - pasta',         type: 'in',  counterparty: 'Giorgio',   date: '2026-04-24' },
-  { id: 3, amount: '-34.00', currency: 'EUR', description: 'Taxi condiviso aeroporto',      type: 'out', counterparty: 'Diego',     date: '2026-04-23' },
-  { id: 4, amount: '+22.00', currency: 'EUR', description: 'Cinema biglietti x4',           type: 'in',  counterparty: 'Vaggelis',  date: '2026-04-23' },
-  { id: 5, amount: '-8.50',  currency: 'EUR', description: 'Caffè e cornetti',              type: 'out', counterparty: 'Vaggelis',  date: '2026-04-22' },
-  { id: 6, amount: '-45.00', currency: 'EUR', description: 'Supermercato spesa settimana',  type: 'out', counterparty: 'Diego',     date: '2026-04-22' },
+function mockDate(daysAgo: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() - daysAgo)
+  d.setHours(12, 0, 0, 0) // noon — matches mock-data.ts convention
+  return d.toISOString()
+}
+
+const MOCK_TRANSACTIONS = [
+  // Today
+  { id: 10, amount: '-61.50', currency: 'EUR', description: 'Lunch Foodhallen - bitterballen + beers', type: 'out', counterparty: 'Foodhallen Amsterdam', date: mockDate(0) },
+  { id: 11, amount: '-22.00', currency: 'EUR', description: 'Breakfast Lot Sixty One',                 type: 'out', counterparty: 'Lot Sixty One Coffee', date: mockDate(0) },
+  // Yesterday
+  { id: 1,  amount: '-96.00', currency: 'EUR', description: 'Pizzeria da Mario - dinner for 4',        type: 'out', counterparty: 'Pizzeria da Mario',    date: mockDate(1) },
+  { id: 2,  amount: '-34.00', currency: 'EUR', description: 'Taxi Uber - airport shared',              type: 'out', counterparty: 'Uber',                  date: mockDate(1) },
+  { id: 3,  amount: '-25.00', currency: 'EUR', description: 'Bar Centrale - birre',                    type: 'out', counterparty: 'Bar Centrale',          date: mockDate(1) },
+  { id: 4,  amount: '+32.00', currency: 'EUR', description: 'Pizzeria da Mario - share back',          type: 'in',  counterparty: 'Diego',                 date: mockDate(1) },
+  // 2 days ago
+  { id: 5,  amount: '-92.00', currency: 'EUR', description: 'Cena Osteria del Porto - group dinner',   type: 'out', counterparty: 'Osteria del Porto',     date: mockDate(2) },
+  { id: 6,  amount: '-28.40', currency: 'EUR', description: 'Grocery Dirck III - wine + snacks',       type: 'out', counterparty: 'Dirck III Slijterij',   date: mockDate(2) },
+  { id: 7,  amount: '+23.00', currency: 'EUR', description: 'Osteria del Porto - share back',          type: 'in',  counterparty: 'Vaggelis',              date: mockDate(2) },
+  // 3 days ago
+  { id: 8,  amount: '-32.00', currency: 'EUR', description: 'Aperitivo Bar Sport - negroni x4',        type: 'out', counterparty: 'Bar Sport',             date: mockDate(3) },
+  { id: 9,  amount: '-18.00', currency: 'EUR', description: 'Aperitivo Spritz Bar',                    type: 'out', counterparty: 'Spritz Bar',            date: mockDate(3) },
+  // 4 days ago
+  { id: 12, amount: '-54.00', currency: 'EUR', description: 'Hackathon lunch - De Balie',              type: 'out', counterparty: 'De Balie',              date: mockDate(4) },
+  { id: 13, amount: '-41.60', currency: 'EUR', description: 'Train tickets Amsterdam-Utrecht',         type: 'out', counterparty: 'NS Nederlandse Spoorwegen', date: mockDate(4) },
+  // 5 days ago
+  { id: 14, amount: '-78.00', currency: 'EUR', description: 'Sushi restaurant Yoshimi',                type: 'out', counterparty: 'Yoshimi Sushi',         date: mockDate(5) },
+  { id: 15, amount: '-48.00', currency: 'EUR', description: 'Bowling The Alley + shoes rental',        type: 'out', counterparty: 'The Alley Bowling',     date: mockDate(5) },
+  // 6 days ago
+  { id: 16, amount: '-210.00', currency: 'EUR', description: 'Airbnb apartment 2 nights',              type: 'out', counterparty: 'Airbnb',                date: mockDate(6) },
+  { id: 17, amount: '-55.00', currency: 'EUR', description: 'The Irish Pub - drinks round',            type: 'out', counterparty: 'The Irish Pub',         date: mockDate(6) },
+  { id: 18, amount: '+70.00', currency: 'EUR', description: 'Airbnb - share back',                     type: 'in',  counterparty: 'Francesco',             date: mockDate(6) },
+  // 7 days ago
+  { id: 19, amount: '-120.00', currency: 'EUR', description: 'Cena ristorante La Pergola',             type: 'out', counterparty: 'La Pergola',            date: mockDate(7) },
+  { id: 20, amount: '-53.80', currency: 'EUR', description: 'Grocery Jumbo supermarkt',                type: 'out', counterparty: 'Jumbo',                 date: mockDate(7) },
 ]
 
 const MOCK_REQUESTS = [
-  { id: 101, amount: '15.75', currency: 'EUR', description: 'Pranzo hackathon',       from: 'Diego',     status: 'PENDING', date: '2026-04-24' },
-  { id: 102, amount: '12.50', currency: 'EUR', description: 'Aperitivo bar centro',   from: 'Vaggelis',  status: 'PENDING', date: '2026-04-23' },
+  { id: 101, amount: '18.00', currency: 'EUR', description: 'Aperitivo Spritz Bar',    from: 'Vaggelis',  status: 'PENDING', date: mockDate(3) },
+  { id: 102, amount: '24.00', currency: 'EUR', description: 'De Balie hackathon lunch', from: 'Francesco', status: 'PENDING', date: mockDate(4) },
+  { id: 103, amount: '13.50', currency: 'EUR', description: 'Starbucks coffee round',   from: 'Diego',     status: 'PENDING', date: mockDate(1) },
 ]

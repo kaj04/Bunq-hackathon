@@ -5,6 +5,7 @@ import { Dashboard } from '@/components/dashboard/Dashboard'
 import { GroupsGrid } from '@/components/groups/GroupsGrid'
 import { GroupChat } from '@/components/groups/GroupChat'
 import { AddExpenseModal } from '@/components/expenses/AddExpenseModal'
+import { QuickPayModal } from '@/components/payments/QuickPayModal'
 import { Group, GroupExpense, Transaction, PaymentRequest, SplitResult } from '@/types/designer'
 
 // Sandbox users with placeholder aliases — real emails loaded from /api/bunq/members on mount
@@ -39,10 +40,17 @@ export const MeditaSplit: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home')
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
+  const [isQuickPayOpen, setIsQuickPayOpen] = useState(false)
   const [balance, setBalance] = useState('0.00')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [requests, setRequests] = useState<PaymentRequest[]>([])
-  const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS)
+  const [groups, setGroups] = useState<Group[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_GROUPS
+    try {
+      const saved = localStorage.getItem('meditasplit_groups')
+      return saved ? JSON.parse(saved) : INITIAL_GROUPS
+    } catch { return INITIAL_GROUPS }
+  })
   const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>(INITIAL_MEMBERS)
   const [currentUser, setCurrentUser] = useState('Me')
 
@@ -77,6 +85,7 @@ export const MeditaSplit: React.FC = () => {
             id: tx.id,
             description: tx.description ?? '',
             counterparty: tx.counterparty ?? '',
+            isSugarDaddy: tx.isSugarDaddy ?? false,
             amount: Math.abs(parseFloat(tx.amount)),
             type: tx.type === 'in' ? 'income' : 'outcome',
             date: tx.date ?? '',
@@ -102,6 +111,10 @@ export const MeditaSplit: React.FC = () => {
 
   useEffect(() => { fetchData(); fetchMembers() }, [fetchData, fetchMembers])
 
+  useEffect(() => {
+    try { localStorage.setItem('meditasplit_groups', JSON.stringify(groups)) } catch { /* ignore */ }
+  }, [groups])
+
   const handleAcceptRequest = async (id: string) => {
     try {
       await fetch('/api/bunq/requests/accept', {
@@ -114,6 +127,11 @@ export const MeditaSplit: React.FC = () => {
     } catch (e) {
       console.error('Accept request failed', e)
     }
+  }
+
+  const handleUpdateGroup = (updated: Group) => {
+    setGroups(prev => prev.map(g => g.id === updated.id ? updated : g))
+    setSelectedGroup(updated)
   }
 
   const handleCreateGroup = (name: string, emoji: string, color: string, members: { name: string; alias: string }[]) => {
@@ -175,6 +193,7 @@ export const MeditaSplit: React.FC = () => {
   }
 
   const openAddExpense = () => setIsAddExpenseOpen(true)
+  const openQuickPay = () => setIsQuickPayOpen(true)
 
   const activeGroup = selectedGroup ?? groups[0]
 
@@ -192,7 +211,7 @@ export const MeditaSplit: React.FC = () => {
               transactions={transactions}
               requests={requests}
               onAcceptRequest={handleAcceptRequest}
-              onAddExpense={openAddExpense}
+              onAddExpense={openQuickPay}
               onRefresh={fetchData}
             />
           )}
@@ -214,7 +233,13 @@ export const MeditaSplit: React.FC = () => {
               group={selectedGroup}
               onBack={() => setSelectedGroup(null)}
               onOpenAddExpense={openAddExpense}
+              availableContacts={ALL_MEMBERS.map(m => {
+                const live = memberAliases.find(a => a.name === m.name)
+                return { name: m.name, alias: live?.alias || m.alias }
+              })}
+              onUpdateGroup={handleUpdateGroup}
               onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
+              currentUser={currentUser}
             />
           )}
         </main>
@@ -226,6 +251,13 @@ export const MeditaSplit: React.FC = () => {
           currentUser={currentUser}
           onClose={() => setIsAddExpenseOpen(false)}
           onConfirm={handleConfirmExpense}
+        />
+      )}
+
+      {isQuickPayOpen && (
+        <QuickPayModal
+          onClose={() => setIsQuickPayOpen(false)}
+          onSuccess={fetchData}
         />
       )}
     </div>

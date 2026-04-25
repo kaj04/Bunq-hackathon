@@ -63,6 +63,7 @@ export async function searchRecentPayments(query: string, days: number): Promise
 function filterMockPayments(payments: any[], query: string, days: number): BunqPayment[] {
   const cutoff = new Date()
   cutoff.setDate(cutoff.getDate() - days)
+  cutoff.setHours(0, 0, 0, 0) // snap to start-of-day so whole days are included
   const terms = query.toLowerCase().split(/[|\s,]+/).filter(Boolean)
   return payments
     .filter(p => !isRecurring(p))

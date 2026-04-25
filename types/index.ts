@@ -44,7 +44,12 @@ export type BunqPayment = {
   description: string
   amount: { value: string; currency: string }
   created: string
-  counterparty_alias: { display_name: string }
+  updated?: string
+  monetary_account_id?: number
+  alias?: { display_name: string; iban?: string; type?: string }
+  counterparty_alias: { display_name: string; type?: string }
+  type?: string
+  balance_after_mutation?: { value: string; currency: string }
 }
 
 export type SplitProposal = {

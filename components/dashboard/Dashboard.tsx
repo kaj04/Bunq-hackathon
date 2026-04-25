@@ -14,9 +14,11 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, requests, onAcceptRequest, onAddExpense, onRefresh }) => {
   const [funding, setFunding] = useState(false)
+  const [fundingStatus, setFundingStatus] = useState<string | null>(null)
 
   const handleAddFunds = async () => {
     setFunding(true)
+    setFundingStatus('Requesting funds...')
     try {
       const res = await fetch('/api/bunq/fund-me', {
         method: 'POST',
@@ -24,13 +26,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
         body: JSON.stringify({ amount: 500 }),
       })
       const data = await res.json()
-      if (data.success) {
-        setTimeout(() => onRefresh?.(), 1500)
-      } else alert('Fund error: ' + data.error)
+      if (!data.success) { alert('Fund error: ' + data.error); return }
+
+      // Poll every 3s until balance changes (Bunq sugar daddy accepts async, ~10-15s)
+      setFundingStatus('Waiting for Bunq to credit...')
+      let attempts = 0
+      const poll = async () => {
+        attempts++
+        onRefresh?.()
+        if (attempts < 8) setTimeout(poll, 3000)
+        else { setFunding(false); setFundingStatus(null) }
+      }
+      setTimeout(poll, 3000)
     } catch (e) {
       alert('Fund failed: ' + e)
-    } finally {
       setFunding(false)
+      setFundingStatus(null)
     }
   }
 
@@ -39,38 +50,84 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
 
       {/* Top section */}
       <div className="flex justify-between items-start gap-8">
-        <div className="bg-card rounded-[24px] p-6 w-[540px] border border-zinc-800 relative overflow-hidden group shadow-xl">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-bunq opacity-5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:opacity-10 transition-opacity" />
-          <p className="text-zinc-500 text-sm font-medium mb-1">Total Balance</p>
-          <h1 className="text-5xl font-bold mb-8 tracking-tight italic">€ {balance}</h1>
-          <div className="flex items-center gap-4">
-            <div className="bg-zinc-800/50 px-4 py-1.5 rounded-full text-xs font-mono text-zinc-400 border border-zinc-700/50">MARC· 1234</div>
-            <div className="text-[10px] text-bunq font-bold tracking-[0.2em] uppercase">Mastercard Gold</div>
+        {/* Bunq card */}
+        <div className="w-[540px] h-[200px] rounded-[28px] relative overflow-hidden shadow-2xl select-none"
+          style={{ background: '#1a8fe3' }}>
+
+          {/* colorful vertical stripes — right third of card */}
+          <div className="absolute right-0 top-0 h-full flex" style={{ width: '42%' }}>
+            {['#e63946','#f4722b','#f9c74f','#90be6d','#43aa8b','#277da1','#6a0572','#c77dff'].map((c, i) => (
+              <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
+            ))}
+          </div>
+
+          {/* subtle overlay to blend stripes */}
+          <div className="absolute right-0 top-0 h-full w-[42%] bg-black/10" />
+
+          {/* bunq wordmark + type */}
+          <div className="absolute top-6 left-7">
+            <p className="text-white font-black text-2xl tracking-[-0.05em] leading-none">bunq</p>
+            <p className="text-white/70 text-xs font-semibold mt-0.5">credit</p>
+          </div>
+
+          {/* balance */}
+          <div className="absolute bottom-14 left-7">
+            <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Balance</p>
+            <p className="text-white text-4xl font-bold tracking-tight">€ {balance}</p>
+          </div>
+
+          {/* card number + mastercard */}
+          <div className="absolute bottom-5 left-7 right-7 flex items-center justify-between z-10">
+            <p className="text-white/80 text-sm font-mono tracking-[0.18em]">•••• •••• •••• 1234</p>
+            <div className="flex items-center">
+              <div className="w-7 h-7 rounded-full bg-[#eb001b] opacity-90 -mr-3" />
+              <div className="w-7 h-7 rounded-full bg-[#f79e1b] opacity-90" />
+            </div>
           </div>
         </div>
 
         <div className="flex gap-4">
+          {/* Add Expense — coral pastel with dot pattern */}
           <button
             onClick={onAddExpense}
-            className="h-[160px] w-36 bg-bunq text-black rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-bunq/20 group"
+            className="h-[160px] w-36 rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg group relative overflow-hidden"
+            style={{ background: '#fddde6' }}
           >
-            <div className="p-3 bg-black/10 rounded-2xl group-hover:bg-black/20 transition-colors">
-              <ArrowUpRight className="w-8 h-8" />
+            <div className="absolute inset-0 opacity-20"
+              style={{
+                backgroundImage: 'radial-gradient(circle, #e63946 1.5px, transparent 1.5px)',
+                backgroundSize: '14px 14px',
+              }} />
+            <div className="relative z-10 flex flex-col items-center gap-3">
+              <div className="p-3 rounded-2xl" style={{ background: 'rgba(230,57,70,0.15)' }}>
+                <ArrowUpRight className="w-8 h-8" style={{ color: '#c0394a' }} />
+              </div>
+              <span className="font-bold text-sm tracking-tight" style={{ color: '#9b2233' }}>Add Expense</span>
             </div>
-            <span className="font-bold text-sm tracking-tight">Add Expense</span>
           </button>
+
+          {/* Add Funds — mint pastel with diagonal stripe pattern */}
           <button
             onClick={handleAddFunds}
             disabled={funding}
-            className="h-[160px] w-36 bg-card border border-zinc-800 rounded-[24px] flex flex-col items-center justify-center gap-3 hover:bg-zinc-800/50 transition-all active:scale-95 group disabled:opacity-50"
+            className="h-[160px] w-36 rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg group relative overflow-hidden disabled:opacity-60"
+            style={{ background: '#d4f5ed' }}
           >
-            <div className="p-3 bg-white/5 rounded-2xl group-hover:bg-white/10 transition-colors">
-              {funding
-                ? <div className="w-8 h-8 border-2 border-bunq border-t-transparent rounded-full animate-spin" />
-                : <Plus className="w-8 h-8 text-bunq" />
-              }
+            <div className="absolute inset-0 opacity-20"
+              style={{
+                backgroundImage: 'repeating-linear-gradient(45deg, #43aa8b 0px, #43aa8b 1.5px, transparent 1.5px, transparent 12px)',
+              }} />
+            <div className="relative z-10 flex flex-col items-center gap-3">
+              <div className="p-3 rounded-2xl" style={{ background: 'rgba(67,170,139,0.15)' }}>
+                {funding
+                  ? <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#2d8a6e', borderTopColor: 'transparent' }} />
+                  : <Plus className="w-8 h-8" style={{ color: '#2d7a62' }} />
+                }
+              </div>
+              <span className="text-sm font-bold tracking-tight text-center leading-tight px-1" style={{ color: '#1e5c49' }}>
+                {fundingStatus ?? 'Add Funds'}
+              </span>
             </div>
-            <span className="text-sm font-bold text-zinc-300 tracking-tight">{funding ? 'Adding...' : 'Add Funds'}</span>
           </button>
         </div>
       </div>
@@ -82,18 +139,65 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
           <div className="bg-card rounded-[24px] border border-zinc-800 overflow-hidden shadow-sm">
             <table className="w-full text-sm text-left border-separate border-spacing-0">
               <tbody>
-                {transactions.length > 0 ? transactions.map((tx, idx) => (
+                {transactions.length > 0 ? transactions.map((tx, idx) => {
+                  const isTopUp = tx.type === 'income' && tx.isSugarDaddy
+
+                  // Parse enriched description: "[Category] Title — City, Country — HH:MM"
+                  let title = tx.description || tx.counterparty
+                  let location: string | null = null
+                  let time: string | null = null
+                  let categoryEmoji: string | null = null
+
+                  if (!isTopUp && tx.description) {
+                    const catMatch = tx.description.match(/^\[([^\]]+)\]\s*/)
+                    if (catMatch) {
+                      title = tx.description.slice(catMatch[0].length)
+                      const catMap: Record<string, string> = {
+                        'Food & Drink': '🍕', 'Transport': '🚗', 'Shopping': '🛍️',
+                        'Entertainment': '🎬', 'Home': '🏠', 'Health': '💊',
+                        'Travel': '✈️', 'Other': '📦',
+                      }
+                      categoryEmoji = catMap[catMatch[1]] ?? '📦'
+                    }
+                    const timeMatch = title.match(/\s*—\s*(\d{2}:\d{2})\s*$/)
+                    if (timeMatch) {
+                      time = timeMatch[1]
+                      title = title.slice(0, title.length - timeMatch[0].length)
+                    }
+                    const locMatch = title.match(/\s*—\s*(.+)$/)
+                    if (locMatch) {
+                      location = locMatch[1]
+                      title = title.slice(0, title.length - locMatch[0].length).trim()
+                    }
+                  }
+
+                  return (
                   <tr key={idx} className="hover:bg-zinc-800/30 transition-colors group cursor-default border-b border-zinc-800/50 last:border-0">
                     <td className="py-4 px-4">
-                      <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">{tx.description || tx.counterparty}</p>
-                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-0.5">{tx.counterparty}</p>
+                      <p className="font-bold text-zinc-200 group-hover:text-white transition-colors">
+                        {isTopUp ? tx.counterparty : title}
+                      </p>
+                      {isTopUp
+                        ? <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{tx.description}</p>
+                        : location && <p className="text-[10px] text-zinc-500 font-medium mt-0.5">{location}</p>
+                      }
                     </td>
-                    <td className="py-4 px-4 text-zinc-500 text-xs italic opacity-60 font-medium">{tx.groupName || 'Direct'}</td>
+                    <td className="py-4 px-4 text-zinc-400 text-xs font-medium whitespace-nowrap">
+                      {isTopUp
+                        ? <span className="opacity-50 italic">Top-up</span>
+                        : <span className="flex items-center gap-1.5">
+                            {categoryEmoji && <span className="text-base leading-none">{categoryEmoji}</span>}
+                            {time && <span className="opacity-60">{time}</span>}
+                            {!categoryEmoji && !time && <span className="opacity-40 italic">{tx.groupName || 'Direct'}</span>}
+                          </span>
+                      }
+                    </td>
                     <td className={`py-4 px-4 text-right font-bold tabular-nums ${tx.type === 'income' ? 'text-bunq' : 'text-rose-500'}`}>
                       {tx.type === 'income' ? '+' : '-'} € {Math.abs(tx.amount).toFixed(2)}
                     </td>
                   </tr>
-                )) : (
+                  )
+                }) : (
                   <tr>
                     <td colSpan={3} className="py-12 text-center text-zinc-600 italic">No transactions found.</td>
                   </tr>
