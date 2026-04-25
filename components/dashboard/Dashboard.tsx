@@ -1,6 +1,6 @@
 'use client'
 import React, { useState } from 'react'
-import { ArrowUpRight, Plus, X, Send } from 'lucide-react'
+import { ArrowUpRight, Plus } from 'lucide-react'
 import { Transaction, PaymentRequest } from '@/types/designer'
 
 interface DashboardProps {
@@ -12,12 +12,8 @@ interface DashboardProps {
   onRefresh?: () => void
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, requests, onAcceptRequest, onRefresh }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, requests, onAcceptRequest, onAddExpense, onRefresh }) => {
   const [funding, setFunding] = useState(false)
-  const [showExpenseModal, setShowExpenseModal] = useState(false)
-  const [expenseDescription, setExpenseDescription] = useState('')
-  const [expenseAmount, setExpenseAmount] = useState('')
-  const [submitting, setSubmitting] = useState(false)
 
   const handleAddFunds = async () => {
     setFunding(true)
@@ -34,34 +30,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
       alert('Fund failed: ' + e)
     } finally {
       setFunding(false)
-    }
-  }
-
-  const handleSubmitExpense = async () => {
-    if (!expenseDescription.trim() || !expenseAmount) return
-    setSubmitting(true)
-    try {
-      const res = await fetch('/api/bunq/payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: parseFloat(expenseAmount),
-          description: expenseDescription.trim(),
-        }),
-      })
-      const data = await res.json()
-      if (data.success || data.data?.mock) {
-        setShowExpenseModal(false)
-        setExpenseDescription('')
-        setExpenseAmount('')
-        onRefresh?.()
-      } else {
-        alert('Error: ' + (data.error ?? 'unknown'))
-      }
-    } catch (e) {
-      alert('Failed: ' + e)
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -83,7 +51,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
 
           <div className="flex gap-4">
             <button
-              onClick={() => setShowExpenseModal(true)}
+              onClick={onAddExpense}
               className="h-[160px] w-36 bg-bunq text-black rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-bunq/20 group"
             >
               <div className="p-3 bg-black/10 rounded-2xl group-hover:bg-black/20 transition-colors">
@@ -173,58 +141,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
         </div>
       </div>
 
-      {/* Modal aggiunta spesa semplice */}
-      {showExpenseModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-background/80 backdrop-blur-sm">
-          <div className="bg-card w-full max-w-md rounded-[32px] border border-white/10 shadow-2xl p-8 space-y-6">
-            <div className="flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-bold">Add Expense</h3>
-                <p className="text-xs text-zinc-500 mt-1">Registra un pagamento nel sandbox Bunq</p>
-              </div>
-              <button onClick={() => setShowExpenseModal(false)} className="p-2 hover:bg-white/5 rounded-full text-zinc-500 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block">Descrizione</label>
-                <input
-                  value={expenseDescription}
-                  onChange={e => setExpenseDescription(e.target.value)}
-                  placeholder="es. Cena al ristorante"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-bunq placeholder:text-zinc-600"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 block">Importo (€)</label>
-                <input
-                  value={expenseAmount}
-                  onChange={e => setExpenseAmount(e.target.value)}
-                  placeholder="0.00"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm focus:outline-none focus:ring-2 focus:ring-bunq placeholder:text-zinc-600"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={handleSubmitExpense}
-              disabled={!expenseDescription.trim() || !expenseAmount || submitting}
-              className="w-full bg-bunq text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-bunq/20 disabled:opacity-40 disabled:scale-100"
-            >
-              <Send size={18} />
-              {submitting ? 'Invio in corso...' : 'Registra pagamento'}
-            </button>
-            <p className="text-center text-[10px] text-zinc-600 uppercase tracking-widest">
-              Transazione registrata nel sandbox Bunq
-            </p>
-          </div>
-        </div>
-      )}
     </>
   )
 }
