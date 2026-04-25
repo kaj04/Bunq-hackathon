@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react'
-import { X, CreditCard, Send, Loader2, MapPin } from 'lucide-react'
+import { X, CreditCard, Send, Loader2, MapPin, Clock, Pencil } from 'lucide-react'
 
 const CATEGORIES = [
   { emoji: '🍕', label: 'Food & Drink' },
@@ -31,6 +31,13 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
   const [category, setCategory] = useState(CATEGORIES[0])
   const [location, setLocation] = useState<Location | null>(null)
   const [locLoading, setLocLoading] = useState(false)
+  const [editingLocation, setEditingLocation] = useState(false)
+  const [manualCity, setManualCity] = useState('')
+  const [datetime, setDatetime] = useState(() => {
+    const now = new Date()
+    now.setSeconds(0, 0)
+    return now.toISOString().slice(0, 16) // "2026-04-25T20:15"
+  })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -70,7 +77,10 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
     setLoading(true)
     setError(null)
     try {
-      const now = new Date()
+      const cityOverride = manualCity.trim()
+      const effectiveLocation = cityOverride
+        ? { ...( location ?? { latitude: 52.37, longitude: 4.89 }), city: cityOverride.split(',')[0].trim(), country: cityOverride.includes(',') ? cityOverride.split(',')[1].trim() : location?.country ?? 'NL' }
+        : location ?? undefined
       const res = await fetch('/api/bunq/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -79,8 +89,8 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
           description: description.trim(),
           category: category.label,
           categoryEmoji: category.emoji,
-          location: location ?? undefined,
-          timestamp: now.toISOString(),
+          location: effectiveLocation,
+          timestamp: new Date(datetime).toISOString(),
         }),
       })
       const data = await res.json()
@@ -165,19 +175,47 @@ export const QuickPayModal: React.FC<QuickPayModalProps> = ({ onClose, onSuccess
             </div>
           </div>
 
-          {/* Location */}
-          <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
-            <MapPin size={16} className="text-bunq flex-shrink-0" />
-            {locLoading ? (
-              <span className="text-white/30 text-xs">Detecting location...</span>
-            ) : location ? (
-              <span className="text-white/60 text-xs font-medium">{location.city}, {location.country}</span>
-            ) : (
-              <span className="text-white/20 text-xs">Location unavailable</span>
-            )}
-            <span className="text-white/20 text-[10px] ml-auto uppercase tracking-widest">
-              {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </span>
+          {/* Location + Time */}
+          <div className="space-y-2">
+            <p className="text-white/30 text-[10px] font-bold uppercase tracking-widest">Location & Time</p>
+
+            {/* Location row */}
+            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
+              <MapPin size={16} className="text-bunq flex-shrink-0" />
+              {editingLocation ? (
+                <input
+                  autoFocus
+                  value={manualCity}
+                  onChange={e => setManualCity(e.target.value)}
+                  onBlur={() => setEditingLocation(false)}
+                  onKeyDown={e => e.key === 'Enter' && setEditingLocation(false)}
+                  placeholder={location ? `${location.city}, ${location.country}` : 'City, Country'}
+                  className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/30"
+                />
+              ) : (
+                <span className="flex-1 text-white/60 text-xs font-medium">
+                  {manualCity.trim() || (locLoading ? 'Detecting...' : location ? `${location.city}, ${location.country}` : 'Unknown')}
+                </span>
+              )}
+              <button
+                onClick={() => { setEditingLocation(true) }}
+                className="text-white/20 hover:text-bunq transition-colors"
+                title="Edit location"
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
+
+            {/* Datetime row */}
+            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-3">
+              <Clock size={16} className="text-bunq flex-shrink-0" />
+              <input
+                type="datetime-local"
+                value={datetime}
+                onChange={e => setDatetime(e.target.value)}
+                className="flex-1 bg-transparent text-xs text-white/60 outline-none [color-scheme:dark]"
+              />
+            </div>
           </div>
 
           {error && <p className="text-rose-400 text-xs text-center">{error}</p>}
