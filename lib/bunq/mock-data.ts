@@ -179,9 +179,8 @@ export const MOCK_PAYMENTS = [
 
 // Contacts — includes Francesca alongside Francesco for disambiguation testing
 export const MOCK_CONTACTS = [
-  { name: 'Francesco', alias: 'test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com' },
-  { name: 'Francesca', alias: 'francesca@sandbox.com' },
-  { name: 'Giorgio',   alias: 'giorgio@sandbox.com' },
-  { name: 'Vaggelis',  alias: 'vaggelis@sandbox.com' },
-  { name: 'Diego',     alias: 'diego@sandbox.com' },
+  { name: 'Vaggelis',  alias: 'test+438e4ee5-c088-45e5-8dbc-ed42fc4db3f5@bunq.com' },
+  { name: 'Francesco', alias: 'test+f58943b1-e202-441a-8c39-9589d1f2e3ef@bunq.com' },
+  { name: 'Diego',     alias: 'test+5dc812cc-6992-4af1-8f28-1dc23e53abf2@bunq.com' },
+  { name: 'Giorgio',   alias: 'test+3b8908fa-ed86-4b1b-9416-d6cc83473b88@bunq.com' },
 ]
