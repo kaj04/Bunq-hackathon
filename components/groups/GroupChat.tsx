@@ -38,8 +38,10 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
   }, [messages])
 
+  const msgCounter = useRef(100)
   const addMessage = (sender: 'user' | 'agent', text: string) => {
-    setMessages(prev => [...prev, { id: Date.now().toString(), sender, text, timestamp: new Date().toISOString() }])
+    const id = String(++msgCounter.current)
+    setMessages(prev => [...prev, { id, sender, text, timestamp: new Date().toISOString() }])
   }
 
   const handleSend = async () => {
