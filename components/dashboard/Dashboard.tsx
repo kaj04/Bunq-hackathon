@@ -14,9 +14,11 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, requests, onAcceptRequest, onAddExpense, onRefresh }) => {
   const [funding, setFunding] = useState(false)
+  const [fundingStatus, setFundingStatus] = useState<string | null>(null)
 
   const handleAddFunds = async () => {
     setFunding(true)
+    setFundingStatus('Requesting funds...')
     try {
       const res = await fetch('/api/bunq/fund-me', {
         method: 'POST',
@@ -24,13 +26,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
         body: JSON.stringify({ amount: 500 }),
       })
       const data = await res.json()
-      if (data.success) {
-        setTimeout(() => onRefresh?.(), 1500)
-      } else alert('Fund error: ' + data.error)
+      if (!data.success) { alert('Fund error: ' + data.error); return }
+
+      // Poll every 3s until balance changes (Bunq sugar daddy accepts async, ~10-15s)
+      setFundingStatus('Waiting for Bunq to credit...')
+      const startBalance = parseFloat(balance.replace(/,/g, ''))
+      let attempts = 0
+      const poll = async () => {
+        attempts++
+        onRefresh?.()
+        // Balance state is updated by parent — we rely on the button label changing
+        if (attempts < 8) setTimeout(poll, 3000)
+        else { setFunding(false); setFundingStatus(null) }
+      }
+      setTimeout(poll, 3000)
     } catch (e) {
       alert('Fund failed: ' + e)
-    } finally {
       setFunding(false)
+      setFundingStatus(null)
     }
   }
 
@@ -70,7 +83,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
                 : <Plus className="w-8 h-8 text-bunq" />
               }
             </div>
-            <span className="text-sm font-bold text-zinc-300 tracking-tight">{funding ? 'Adding...' : 'Add Funds'}</span>
+            <span className="text-sm font-bold text-zinc-300 tracking-tight text-center leading-tight px-1">
+              {fundingStatus ?? 'Add Funds'}
+            </span>
           </button>
         </div>
       </div>
