@@ -297,14 +297,19 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
             {isRecording && (
               <span className="absolute inset-0 rounded-full animate-ping bg-bunq/30 scale-150" />
             )}
-            <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all
-              ${isRecording
-                ? 'bg-rose-500 shadow-rose-500/40 scale-110'
-                : 'bg-bunq shadow-bunq/40 hover:scale-110 active:scale-95'
-              }`}
-              style={!isRecording ? { background: 'linear-gradient(135deg, #00c47a, #00a86b, #007a4d)' } : {}}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all overflow-hidden relative
+              ${isRecording ? 'scale-110 shadow-rose-500/40' : 'hover:scale-110 active:scale-95 shadow-bunq/30'}`}
             >
-              <Mic size={26} className="text-black" />
+              {/* stripes background */}
+              {!isRecording && (
+                <div className="absolute inset-0 flex">
+                  {['#e63946','#f4722b','#f9c74f','#90be6d','#43aa8b','#277da1','#6a0572','#c77dff'].map((c, i) => (
+                    <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+              )}
+              {isRecording && <div className="absolute inset-0 bg-rose-500" />}
+              <Mic size={26} className="text-white relative z-10 drop-shadow-md" />
             </div>
             <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${
               isRecording ? 'text-rose-400' : 'text-bunq'

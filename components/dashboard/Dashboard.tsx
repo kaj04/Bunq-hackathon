@@ -72,12 +72,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
             <p className="text-white/70 text-xs font-semibold mt-0.5">credit</p>
           </div>
 
-          {/* circular travel icon top-right */}
-          <div className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg z-10">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a8fe3" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
-            </svg>
-          </div>
 
           {/* balance */}
           <div className="absolute bottom-14 left-7">
