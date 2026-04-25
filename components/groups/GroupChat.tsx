@@ -282,8 +282,39 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
         )}
       </div>
 
-      {/* Input bar */}
-      <div className="p-6 pt-2">
+      {/* Input area */}
+      <div className="p-6 pt-2 space-y-3">
+
+        {/* Mic button — prominent, standalone, bunq-branded */}
+        <div className="flex justify-center">
+          <button
+            onClick={isRecording ? stopVoice : startVoice}
+            disabled={isProcessing}
+            title={isRecording ? 'Stop recording' : 'Tap to speak'}
+            className={`relative flex flex-col items-center gap-2 group disabled:opacity-40 transition-all`}
+          >
+            {/* outer glow ring when recording */}
+            {isRecording && (
+              <span className="absolute inset-0 rounded-full animate-ping bg-bunq/30 scale-150" />
+            )}
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl transition-all
+              ${isRecording
+                ? 'bg-rose-500 shadow-rose-500/40 scale-110'
+                : 'bg-bunq shadow-bunq/40 hover:scale-110 active:scale-95'
+              }`}
+              style={!isRecording ? { background: 'linear-gradient(135deg, #00c47a, #00a86b, #007a4d)' } : {}}
+            >
+              <Mic size={26} className="text-black" />
+            </div>
+            <span className={`text-[10px] font-bold uppercase tracking-widest transition-colors ${
+              isRecording ? 'text-rose-400' : 'text-bunq'
+            }`}>
+              {isRecording ? '● Recording...' : 'Speak'}
+            </span>
+          </button>
+        </div>
+
+        {/* Text + camera + send bar */}
         <div className="bg-card rounded-[28px] border border-zinc-800 p-2 pl-4 flex items-center gap-2 shadow-2xl">
           <button onClick={() => fileRef.current?.click()} className="p-3 text-zinc-500 hover:text-white transition-colors" title="Attach receipt photo">
             <Camera size={20} />
@@ -292,7 +323,7 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
 
           <input
             type="text"
-            placeholder="Describe the expense or use the microphone..."
+            placeholder="Or type the expense..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleSend()}
@@ -300,29 +331,14 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
             className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-2 placeholder:text-zinc-600 disabled:opacity-40"
           />
 
-          <div className="flex items-center gap-1">
-            <button
-              onClick={isRecording ? stopVoice : startVoice}
-              disabled={isProcessing}
-              className={`p-3 rounded-2xl transition-all ${
-                isRecording ? 'bg-rose-500 text-white animate-pulse' : 'text-zinc-500 hover:text-bunq hover:bg-white/5'
-              }`}
-              title={isRecording ? 'Stop recording' : 'Record voice message'}
-            >
-              <Mic size={20} />
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={!inputText.trim() || isProcessing}
-              className="w-12 h-12 bg-bunq text-black rounded-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-lg shadow-bunq/20 disabled:opacity-40"
-            >
-              <Send size={20} />
-            </button>
-          </div>
+          <button
+            onClick={handleSend}
+            disabled={!inputText.trim() || isProcessing}
+            className="w-12 h-12 bg-bunq text-black rounded-2xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 shadow-lg shadow-bunq/20 disabled:opacity-40"
+          >
+            <Send size={20} />
+          </button>
         </div>
-        <p className="text-center text-[10px] text-zinc-600 mt-3 font-bold uppercase tracking-widest">
-          🎤 Speak · 📷 Attach receipt · ✍️ Type
-        </p>
       </div>
     </div>
   )

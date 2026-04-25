@@ -53,35 +53,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
       {/* Top section */}
       <div className="flex justify-between items-start gap-8">
         {/* Bunq card */}
-        <div className="w-[540px] h-[200px] rounded-[28px] relative overflow-hidden shadow-2xl shadow-bunq/30 select-none"
-          style={{ background: 'linear-gradient(135deg, #00a86b 0%, #007a4d 50%, #004d31 100%)' }}>
+        <div className="w-[540px] h-[200px] rounded-[28px] relative overflow-hidden shadow-2xl select-none"
+          style={{ background: '#1a8fe3' }}>
 
-          {/* decorative circles */}
-          <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-white/5" />
-          <div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-white/5" />
-          <div className="absolute top-6 right-6 w-24 h-24 rounded-full bg-white/5" />
+          {/* colorful vertical stripes — right third of card */}
+          <div className="absolute right-0 top-0 h-full flex" style={{ width: '42%' }}>
+            {['#e63946','#f4722b','#f9c74f','#90be6d','#43aa8b','#277da1','#6a0572','#c77dff'].map((c, i) => (
+              <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
+            ))}
+          </div>
 
-          {/* bunq wordmark */}
-          <div className="absolute top-6 left-6 text-white font-black text-2xl tracking-[-0.05em]">bunq</div>
+          {/* subtle overlay to blend stripes */}
+          <div className="absolute right-0 top-0 h-full w-[42%] bg-black/10" />
 
-          {/* chip SVG */}
-          <svg className="absolute top-6 right-6 opacity-80" width="38" height="30" viewBox="0 0 38 30">
-            <rect width="38" height="30" rx="4" fill="#d4a843" />
-            <rect x="13" y="0" width="12" height="30" fill="#c49b35" />
-            <rect x="0" y="9" width="38" height="12" fill="#c49b35" />
-            <rect x="13" y="9" width="12" height="12" fill="#b8882a" />
-          </svg>
+          {/* bunq wordmark + type */}
+          <div className="absolute top-6 left-7">
+            <p className="text-white font-black text-2xl tracking-[-0.05em] leading-none">bunq</p>
+            <p className="text-white/70 text-xs font-semibold mt-0.5">credit</p>
+          </div>
+
+          {/* circular travel icon top-right */}
+          <div className="absolute top-5 right-5 w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg z-10">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a8fe3" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.96-.96a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+            </svg>
+          </div>
 
           {/* balance */}
-          <div className="absolute bottom-14 left-6">
-            <p className="text-white/50 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Balance</p>
+          <div className="absolute bottom-14 left-7">
+            <p className="text-white/60 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Balance</p>
             <p className="text-white text-4xl font-bold tracking-tight">€ {balance}</p>
           </div>
 
-          {/* card number + name */}
-          <div className="absolute bottom-5 left-6 right-6 flex items-end justify-between">
-            <p className="text-white/70 text-sm font-mono tracking-[0.15em]">•••• •••• •••• 4829</p>
-            <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest">Francesco</p>
+          {/* card number + mastercard */}
+          <div className="absolute bottom-5 left-7 right-7 flex items-center justify-between z-10">
+            <p className="text-white/80 text-sm font-mono tracking-[0.18em]">•••• •••• •••• 1234</p>
+            {/* Mastercard circles */}
+            <div className="flex items-center">
+              <div className="w-7 h-7 rounded-full bg-[#eb001b] opacity-90 -mr-3" />
+              <div className="w-7 h-7 rounded-full bg-[#f79e1b] opacity-90" />
+            </div>
           </div>
         </div>
 
