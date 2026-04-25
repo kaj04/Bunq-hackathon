@@ -42,7 +42,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ApiResponse<S
           items: s.items ?? [],
         }
       })
-      .filter((s) => s.participant.name)
+      .filter((s: any) => s.participant.name)
 
     return NextResponse.json({ success: true, data: result, description })
   } catch (err) {

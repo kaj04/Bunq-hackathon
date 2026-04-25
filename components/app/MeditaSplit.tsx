@@ -5,6 +5,7 @@ import { Dashboard } from '@/components/dashboard/Dashboard'
 import { GroupsGrid } from '@/components/groups/GroupsGrid'
 import { GroupChat } from '@/components/groups/GroupChat'
 import { AddExpenseModal } from '@/components/expenses/AddExpenseModal'
+import { QuickPayModal } from '@/components/payments/QuickPayModal'
 import { Group, GroupExpense, Transaction, PaymentRequest, SplitResult } from '@/types/designer'
 
 // Sandbox users with placeholder aliases — real emails loaded from /api/bunq/members on mount
@@ -39,6 +40,7 @@ export const MeditaSplit: React.FC = () => {
   const [activeTab, setActiveTab] = useState('home')
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null)
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false)
+  const [isQuickPayOpen, setIsQuickPayOpen] = useState(false)
   const [balance, setBalance] = useState('0.00')
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [requests, setRequests] = useState<PaymentRequest[]>([])
@@ -175,6 +177,7 @@ export const MeditaSplit: React.FC = () => {
   }
 
   const openAddExpense = () => setIsAddExpenseOpen(true)
+  const openQuickPay = () => setIsQuickPayOpen(true)
 
   const activeGroup = selectedGroup ?? groups[0]
 
@@ -192,7 +195,7 @@ export const MeditaSplit: React.FC = () => {
               transactions={transactions}
               requests={requests}
               onAcceptRequest={handleAcceptRequest}
-              onAddExpense={openAddExpense}
+              onAddExpense={openQuickPay}
               onRefresh={fetchData}
             />
           )}
@@ -226,6 +229,13 @@ export const MeditaSplit: React.FC = () => {
           currentUser={currentUser}
           onClose={() => setIsAddExpenseOpen(false)}
           onConfirm={handleConfirmExpense}
+        />
+      )}
+
+      {isQuickPayOpen && (
+        <QuickPayModal
+          onClose={() => setIsQuickPayOpen(false)}
+          onSuccess={fetchData}
         />
       )}
     </div>

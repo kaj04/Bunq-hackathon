@@ -16,7 +16,7 @@ type PendingSplit = {
   total: number
 }
 
-export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAdded }) => {
+export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddExpense, onExpenseAdded }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: '1',
@@ -198,20 +198,25 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAd
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] ml-64 bg-background">
-      {/* Header — senza pulsante Add Expense, tutto passa dalla chat */}
-      <div className="p-6 border-b border-zinc-800 bg-background/50 backdrop-blur-xl sticky top-0 z-10 flex items-center gap-4">
-        <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-xl transition-all">
-          <ArrowLeft size={20} />
-        </button>
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl bg-white/5 border border-zinc-800">
-            {group.emoji}
-          </div>
-          <div>
-            <h2 className="font-bold text-lg">{group.name}</h2>
-            <p className="text-[10px] text-bunq font-bold uppercase tracking-widest">{group.memberCount} Membri</p>
+      {/* Header */}
+      <div className="p-6 border-b border-zinc-800 bg-background/50 backdrop-blur-xl sticky top-0 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button onClick={onBack} className="p-2 hover:bg-white/5 rounded-xl transition-all">
+            <ArrowLeft size={20} />
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-2xl bg-white/5 border border-zinc-800">
+              {group.emoji}
+            </div>
+            <div>
+              <h2 className="font-bold text-lg">{group.name}</h2>
+              <p className="text-[10px] text-bunq font-bold uppercase tracking-widest">{group.memberCount} Membri</p>
+            </div>
           </div>
         </div>
+        <button onClick={onOpenAddExpense} className="btn-primary !py-2 !px-4 text-sm">
+          + Aggiungi Spesa
+        </button>
       </div>
 
       {/* Messages */}
