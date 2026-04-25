@@ -145,7 +145,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
         // Fallback: equal split among group members if NLU returned no participants
         const total = intent.amount ?? 0
         const perPerson = total / group.members.length
-        setSplits(group.members.map(m => ({ name: m, amount: perPerson.toFixed(2) })))
+        setSplits(group.members.map(m => ({ name: m.name, amount: perPerson.toFixed(2) })))
       }
 
       setStep('review')
@@ -162,7 +162,7 @@ export const AddExpenseModal: React.FC<AddExpenseModalProps> = ({ group, onClose
     setProcessingText('Calculating split...')
     const total = parseFloat(manualTotal)
     const perPerson = total / group.members.length
-    setSplits(group.members.map(m => ({ name: m, amount: perPerson.toFixed(2) })))
+    setSplits(group.members.map(m => ({ name: m.name, amount: perPerson.toFixed(2) })))
     setReceiptData({ items: [{ name: manualDescription, price: total }], total })
     setStep('review')
   }

@@ -5,11 +5,34 @@ import { Dashboard } from '@/components/dashboard/Dashboard'
 import { GroupsGrid } from '@/components/groups/GroupsGrid'
 import { GroupChat } from '@/components/groups/GroupChat'
 import { AddExpenseModal } from '@/components/expenses/AddExpenseModal'
-import { Group, Transaction, PaymentRequest, SplitResult } from '@/types/designer'
+import { Group, GroupExpense, Transaction, PaymentRequest, SplitResult } from '@/types/designer'
+
+// Sandbox users with placeholder aliases — real emails loaded from /api/bunq/members on mount
+const INITIAL_MEMBERS = [
+  { name: 'Francesco', userId: 3628453, alias: '' },
+  { name: 'Giorgio',   userId: 3628489, alias: '' },
+  { name: 'Vaggelis',  userId: 3628490, alias: '' },
+  { name: 'Diego',     userId: 3628491, alias: '' },
+]
+
+const ALL_MEMBERS = [
+  { name: 'Francesco', alias: 'test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com' },
+  { name: 'Giorgio',   alias: 'giorgio@sandbox.com' },
+  { name: 'Vaggelis',  alias: 'vaggelis@sandbox.com' },
+  { name: 'Diego',     alias: 'diego@sandbox.com' },
+]
 
 const INITIAL_GROUPS: Group[] = [
-  { id: '1', name: 'Weekend Trip', emoji: '✈️', color: '#8b5cf6', members: ['Francesco', 'Giorgio', 'Diego', 'Vaggelis'], memberCount: 4, totalSpent: 0 },
-  { id: '2', name: 'Dinner Club', emoji: '🍕', color: '#f59e0b', members: ['Francesco', 'Giorgio', 'Diego'], memberCount: 3, totalSpent: 0 },
+  {
+    id: '1', name: 'Weekend Trip', emoji: '✈️', color: '#8b5cf6',
+    members: ALL_MEMBERS,
+    expenses: [], totalSpent: 0, memberCount: 4,
+  },
+  {
+    id: '2', name: 'Dinner Club', emoji: '🍕', color: '#f59e0b',
+    members: ALL_MEMBERS.filter(m => m.name !== 'Vaggelis'),
+    expenses: [], totalSpent: 0, memberCount: 3,
+  },
 ]
 
 export const MeditaSplit: React.FC = () => {
@@ -20,6 +43,15 @@ export const MeditaSplit: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [requests, setRequests] = useState<PaymentRequest[]>([])
   const [groups, setGroups] = useState<Group[]>(INITIAL_GROUPS)
+  const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>(INITIAL_MEMBERS)
+
+  const fetchMembers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/bunq/members')
+      const data = await res.json()
+      if (data.success) setMemberAliases(data.data)
+    } catch { /* keep placeholders */ }
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -61,7 +93,7 @@ export const MeditaSplit: React.FC = () => {
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchData(); fetchMembers() }, [fetchData, fetchMembers])
 
   const handleAcceptRequest = async (id: string) => {
     try {
@@ -80,34 +112,51 @@ export const MeditaSplit: React.FC = () => {
   const handleCreateGroup = (name: string, emoji: string, color: string) => {
     const newGroup: Group = {
       id: Date.now().toString(),
-      name,
-      emoji,
-      color,
-      members: ['Francesco', 'Giorgio', 'Diego'],
-      memberCount: 3,
+      name, emoji, color,
+      members: ALL_MEMBERS,
+      expenses: [],
+      memberCount: ALL_MEMBERS.length,
       totalSpent: 0,
     }
     setGroups(prev => [...prev, newGroup])
   }
 
+  const handleGroupExpenseAdded = (groupId: string, expense: GroupExpense) => {
+    setGroups(prev => prev.map(g => {
+      if (g.id !== groupId) return g
+      const expenses = [...g.expenses, expense]
+      return { ...g, expenses, totalSpent: expenses.reduce((s, e) => s + e.total, 0) }
+    }))
+  }
+
   const handleConfirmExpense = async (description: string, total: number, splits: SplitResult[]) => {
     setIsAddExpenseOpen(false)
     try {
-      await fetch('/api/bunq/split-group', {
+      const members = splits
+        .filter(s => s.name !== 'Francesco') // Francesco è il pagante, non richiede a se stesso
+        .map(s => {
+          const member = memberAliases.find(m => m.name === s.name)
+          return {
+            name: s.name,
+            alias: member?.alias ?? `${s.name.toLowerCase()}@sandbox.com`,
+            amount: parseFloat(s.amount as string),
+          }
+        })
+      const res = await fetch('/api/bunq/split-group', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description,
-          requests: splits.map(s => ({
-            name: s.name,
-            amount: parseFloat(s.amount as string),
-          })),
-        }),
+        body: JSON.stringify({ description, totalAmount: total, members }),
       })
-      if (selectedGroup) {
-        setGroups(prev =>
-          prev.map(g => g.id === selectedGroup.id ? { ...g, totalSpent: g.totalSpent + total } : g)
-        )
+      const data = await res.json()
+      if (!data.success) console.error('Split group error:', data.error)
+      if (selectedGroup && data.batchId) {
+        handleGroupExpenseAdded(selectedGroup.id, {
+          batchId: data.batchId,
+          description,
+          total,
+          date: new Date().toISOString().slice(0, 10),
+          splits: members,
+        })
       }
       fetchData()
     } catch (e) {
@@ -134,6 +183,7 @@ export const MeditaSplit: React.FC = () => {
               requests={requests}
               onAcceptRequest={handleAcceptRequest}
               onAddExpense={openAddExpense}
+              onRefresh={fetchData}
             />
           )}
 
@@ -150,6 +200,7 @@ export const MeditaSplit: React.FC = () => {
               group={selectedGroup}
               onBack={() => setSelectedGroup(null)}
               onOpenAddExpense={openAddExpense}
+              onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
             />
           )}
         </main>

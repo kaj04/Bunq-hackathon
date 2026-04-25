@@ -90,7 +90,7 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, onSelectGroup, o
                 <div className="flex -space-x-1.5">
                   {group.members.slice(0, 3).map((m, i) => (
                     <div key={i} className="w-6 h-6 rounded-full border border-card bg-zinc-800 flex items-center justify-center text-[8px] font-bold text-zinc-400">
-                      {m.charAt(0)}
+                      {m.name.charAt(0)}
                     </div>
                   ))}
                 </div>

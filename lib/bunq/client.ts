@@ -1,12 +1,17 @@
 // OWNER: Francesco
 import crypto from 'crypto'
-import { loadSession, saveSession, clearSession } from './session-store'
+import {
+  loadDevice, saveDevice,
+  loadSession, saveSession, clearSession,
+} from './session-store'
 import type { BunqContact, PaymentRequest } from '@/types'
 
 const BASE_URL = 'https://public-api.sandbox.bunq.com/v1'
 const MOCK = process.env.BUNQ_MOCK === 'true'
 
-// ─── Session state ────────────────────────────────────────────────────────────
+// ─── In-memory state ─────────────────────────────────────────────────────────
+// Sopravvive tra le chiamate nello stesso processo Next.js; si resetta su cold start.
+// Il file system (session-store) è la fonte di verità tra processi/cold start.
 
 const _s = {
   privateKey: '',
@@ -17,7 +22,7 @@ const _s = {
   accountId: 0,
 }
 
-let _initPromise: Promise<void> | null = null
+let _sessionPromise: Promise<void> | null = null
 
 // ─── Crypto helpers ───────────────────────────────────────────────────────────
 
@@ -48,13 +53,9 @@ function buildHeaders(token?: string, method = 'POST', path = '', body = '') {
     'Content-Type': 'application/json',
   }
   if (token) h['X-Bunq-Client-Authentication'] = token
-  if (_s.privateKey && path !== '/installation') {
-    const headerStr = Object.entries(h)
-      .filter(([k]) => k.startsWith('X-Bunq-') || k === 'Cache-Control' || k === 'User-Agent')
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}: ${v}`)
-      .join('\n')
-    h['X-Bunq-Client-Signature'] = sign(`${method} /v1${path}\n\n${headerStr}\n\n${body}`)
+  // Bunq: sign ONLY the request body (SHA256 + RSA PKCS#1 v1.5 + base64)
+  if (_s.privateKey && body) {
+    h['X-Bunq-Client-Signature'] = sign(body)
   }
   return h
 }
@@ -66,55 +67,127 @@ async function bunqReq(method: 'POST' | 'GET' | 'PUT', path: string, body?: obje
     headers: buildHeaders(token ?? _s.sessionToken, method, path, bodyStr),
     body: bodyStr || undefined,
   })
-  if (!res.ok) throw new Error(`Bunq ${method} ${path} → ${res.status}: ${await res.text()}`)
+  if (!res.ok) {
+    const text = await res.text()
+    const err = new Error(`Bunq ${method} ${path} → ${res.status}: ${text}`) as Error & { status: number }
+    err.status = res.status
+    throw err
+  }
   return res.json()
 }
 
-// ─── Handshake ────────────────────────────────────────────────────────────────
+// ─── Device registration — solo la prima volta o dopo 30 giorni ──────────────
+// POST /installation + POST /device-server sono RATE LIMITED.
+// Una volta registrato, il device rimane valido e non va mai riregistrato.
 
-async function _init() {
-  // Try to restore session from disk first
-  const stored = loadSession()
+async function _ensureDevice() {
+  const stored = loadDevice()
   if (stored) {
-    Object.assign(_s, stored)
-    console.log('✓ Bunq session restored from disk')
+    // Riusa keypair e installation token esistenti
+    _s.privateKey = stored.privateKey
+    _s.publicKey = stored.publicKey
+    _s.installationToken = stored.installationToken
+    console.log('✓ Bunq device registration loaded from disk')
     return
   }
 
+  console.log('→ Bunq: registering new device (first time)')
   generateKeys()
   const API_KEY = process.env.BUNQ_API_KEY!
 
   const installRes = await bunqReq('POST', '/installation', { client_public_key: _s.publicKey }, '')
   _s.installationToken = installRes.Response.find((r: any) => r.Token)?.Token.token
 
+  // Questo è il passo RATE LIMITED — viene chiamato una sola volta grazie al file
   await bunqReq('POST', '/device-server', {
     description: 'bunq-hackathon', secret: API_KEY, permitted_ips: ['*'],
   }, _s.installationToken)
 
+  saveDevice({
+    privateKey: _s.privateKey,
+    publicKey: _s.publicKey,
+    installationToken: _s.installationToken,
+  })
+  console.log('✓ Bunq device registered and saved to disk')
+}
+
+// ─── Session creation — ogni ora circa, senza toccare device-server ───────────
+
+async function _createSession() {
+  await _ensureDevice()
+
+  const API_KEY = process.env.BUNQ_API_KEY!
   const sessionRes = await bunqReq('POST', '/session-server', { secret: API_KEY }, _s.installationToken)
   _s.sessionToken = sessionRes.Response.find((r: any) => r.Token)?.Token.token
   _s.userId = sessionRes.Response.find((r: any) => r.UserPerson)?.UserPerson?.id
+    ?? parseInt(process.env.BUNQ_USER_ID ?? '0')
 
   const accRes = await bunqReq('GET', `/user/${_s.userId}/monetary-account`, undefined, _s.sessionToken)
   _s.accountId = accRes.Response[0]?.MonetaryAccountBank?.id
 
-  saveSession({ ..._s })
+  saveSession({ sessionToken: _s.sessionToken, userId: _s.userId, accountId: _s.accountId })
   console.log(`✓ Bunq session created — user: ${_s.userId}, account: ${_s.accountId}`)
 }
 
+// ─── Public init — chiamato da ogni funzione API ──────────────────────────────
+
 export async function initBunq() {
+  // Fast path: sessione già in memoria
   if (_s.sessionToken) return
-  if (!_initPromise) {
-    _initPromise = _init().catch(e => {
-      _initPromise = null
+
+  // Second fast path: sessione valida su disco (tra cold start)
+  const session = loadSession()
+  if (session) {
+    // Carica anche le chiavi dal device file per poter firmare le prossime richieste
+    const device = loadDevice()
+    if (device) {
+      _s.privateKey = device.privateKey
+      _s.publicKey = device.publicKey
+      _s.installationToken = device.installationToken
+    }
+    _s.sessionToken = session.sessionToken
+    _s.userId = session.userId
+    _s.accountId = session.accountId
+    console.log('✓ Bunq session restored from disk')
+    return
+  }
+
+  // Sessione scaduta — ne creiamo una nuova SENZA rifar device-server
+  if (!_sessionPromise) {
+    _sessionPromise = _createSession().catch(e => {
+      _sessionPromise = null
+      // Cancella solo la sessione, MAI il device registration
       clearSession()
       throw e
     })
   }
-  return _initPromise
+  return _sessionPromise
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
+
+/** Pagamento diretto (simulazione spesa personale) — appare nelle transazioni */
+export async function makePayment(amount: number, description: string) {
+  if (MOCK) {
+    MOCK_TRANSACTIONS.unshift({
+      id: Date.now(),
+      amount: `-${amount.toFixed(2)}`,
+      currency: 'EUR',
+      description,
+      type: 'out',
+      counterparty: 'sugardaddy@bunq.com',
+      date: new Date().toISOString().slice(0, 10),
+    })
+    console.log(`[MOCK] Payment €${amount}: ${description}`)
+    return { mock: true }
+  }
+  await initBunq()
+  return bunqReq('POST', `/user/${_s.userId}/monetary-account/${_s.accountId}/payment`, {
+    amount: { value: amount.toFixed(2), currency: 'EUR' },
+    counterparty_alias: { type: 'EMAIL', value: 'sugardaddy@bunq.com' },
+    description,
+  })
+}
 
 /** Invia richiesta di pagamento a una persona */
 export async function createPaymentRequest(req: PaymentRequest) {
@@ -131,12 +204,23 @@ export async function createPaymentRequest(req: PaymentRequest) {
 /** Invia richieste di pagamento a più persone in una volta (split di gruppo) */
 export async function createGroupSplit(requests: PaymentRequest[]) {
   if (MOCK) {
+    const total = requests.reduce((s, r) => s + r.amount, 0)
+    const batchId = Date.now()
+    MOCK_TRANSACTIONS.unshift({
+      id: batchId,
+      amount: `-${total.toFixed(2)}`,
+      currency: 'EUR',
+      description: requests[0]?.description ?? 'Group split',
+      type: 'out',
+      counterparty: requests.map(r => r.recipientAlias.split('@')[0]).join(', '),
+      date: new Date().toISOString().slice(0, 10),
+    })
     console.log(`[MOCK] Group split: ${requests.map(r => `€${r.amount}→${r.recipientAlias}`).join(', ')}`)
-    return { mock: true }
+    return { mock: true, batchId }
   }
   await initBunq()
   const total = requests.reduce((s, r) => s + r.amount, 0)
-  return bunqReq('POST', `/user/${_s.userId}/monetary-account/${_s.accountId}/request-inquiry-batch`, {
+  const res = await bunqReq('POST', `/user/${_s.userId}/monetary-account/${_s.accountId}/request-inquiry-batch`, {
     request_inquiries: requests.map(r => ({
       amount_inquired: { value: r.amount.toFixed(2), currency: r.currency },
       counterparty_alias: { type: 'EMAIL', value: r.recipientAlias },
@@ -145,6 +229,8 @@ export async function createGroupSplit(requests: PaymentRequest[]) {
     })),
     total_amount_inquired: { value: total.toFixed(2), currency: 'EUR' },
   })
+  const batchId: number = res.Response?.[0]?.Id?.id ?? res.Response?.[0]?.RequestInquiryBatch?.id ?? 0
+  return { ...res, batchId }
 }
 
 /** Saldo e info account corrente */
@@ -156,6 +242,17 @@ export async function getBalance() {
     const acc = r.MonetaryAccountBank
     return { name: acc?.description, balance: acc?.balance?.value, currency: acc?.balance?.currency }
   }).filter(Boolean)
+}
+
+/** IBAN e nome dell'account corrente (per il funding) */
+export async function getMyAccountInfo(): Promise<{ iban: string; name: string } | null> {
+  if (MOCK) return { iban: 'NL00BUNQ0123456789', name: 'Francesco Test' }
+  await initBunq()
+  const res = await bunqReq('GET', `/user/${_s.userId}/monetary-account`)
+  const acc = res.Response[0]?.MonetaryAccountBank
+  if (!acc) return null
+  const ibanAlias = acc.alias?.find((a: any) => a.type === 'IBAN')
+  return ibanAlias ? { iban: ibanAlias.value, name: acc.display_name ?? 'Francesco' } : null
 }
 
 /** Ultime transazioni */
@@ -206,16 +303,56 @@ export async function acceptPaymentRequest(requestResponseId: number) {
 }
 
 export async function getBunqContacts(): Promise<BunqContact[]> {
-  return [
+  if (MOCK) return [
     { name: 'Giorgio',   alias: 'giorgio@sandbox.com' },
     { name: 'Vaggelis',  alias: 'vaggelis@sandbox.com' },
     { name: 'Diego',     alias: 'diego@sandbox.com' },
   ]
+  await initBunq()
+  return SANDBOX_USERS.filter(u => u.userId !== _s.userId)
+    .map(u => ({ name: u.name, alias: u.alias }))
 }
+
+/** Fetch email alias for a specific sandbox userId */
+export async function getSandboxUserEmail(userId: number): Promise<string | null> {
+  if (MOCK) {
+    const u = SANDBOX_USERS.find(u => u.userId === userId)
+    return u?.alias ?? null
+  }
+  await initBunq()
+  try {
+    const res = await bunqReq('GET', `/user/${userId}`)
+    const user = res.Response.find((r: any) => r.UserPerson || r.UserCompany || r.UserLight)
+    const userObj = user?.UserPerson ?? user?.UserCompany ?? user?.UserLight
+    const emailAlias = userObj?.alias?.find((a: any) => a.type === 'EMAIL')
+    return emailAlias?.value ?? null
+  } catch {
+    return null
+  }
+}
+
+/** Resolve email aliases for all known sandbox members */
+export async function resolveMemberAliases(): Promise<{ name: string; userId: number; alias: string }[]> {
+  if (MOCK) return SANDBOX_USERS
+  const results = await Promise.all(
+    SANDBOX_USERS.map(async u => {
+      const email = await getSandboxUserEmail(u.userId)
+      return { ...u, alias: email ?? u.alias }
+    })
+  )
+  return results
+}
+
+export const SANDBOX_USERS = [
+  { name: 'Francesco', userId: 3628872, alias: 'test+4a19be6a-58e5-4cc3-ac92-244caa863359@bunq.com' },
+  { name: 'Giorgio',   userId: 3628489, alias: 'giorgio@sandbox.com' },
+  { name: 'Vaggelis',  userId: 3628490, alias: 'vaggelis@sandbox.com' },
+  { name: 'Diego',     userId: 3628491, alias: 'diego@sandbox.com' },
+]
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const MOCK_TRANSACTIONS = [
+const MOCK_TRANSACTIONS: { id: number; amount: string; currency: string; description: string; type: string; counterparty: string; date: string }[] = [
   { id: 1, amount: '-25.50', currency: 'EUR', description: 'Cena da Mario - pizza',         type: 'out', counterparty: 'Giorgio',   date: '2026-04-24' },
   { id: 2, amount: '+18.00', currency: 'EUR', description: 'Cena da Mario - pasta',         type: 'in',  counterparty: 'Giorgio',   date: '2026-04-24' },
   { id: 3, amount: '-34.00', currency: 'EUR', description: 'Taxi condiviso aeroporto',      type: 'out', counterparty: 'Diego',     date: '2026-04-23' },
