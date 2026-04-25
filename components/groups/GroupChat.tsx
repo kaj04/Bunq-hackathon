@@ -6,7 +6,6 @@ import { Group, GroupExpense, ChatMessage } from '@/types/designer'
 interface GroupChatProps {
   group: Group
   onBack: () => void
-  onOpenAddExpense: () => void
   onExpenseAdded?: (expense: GroupExpense) => void
 }
 
@@ -25,7 +24,7 @@ const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
   timestamp: new Date().toISOString(),
 })
 
-export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddExpense, onExpenseAdded }) => {
+export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onExpenseAdded }) => {
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY(group.id))
@@ -238,9 +237,6 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, onBack, onOpenAddEx
             </div>
           </div>
         </div>
-        <button onClick={onOpenAddExpense} className="btn-primary !py-2 !px-4 text-sm">
-          + Add Expense
-        </button>
       </div>
 
       {/* Messages */}

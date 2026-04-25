@@ -91,29 +91,49 @@ export const Dashboard: React.FC<DashboardProps> = ({ balance, transactions, req
         </div>
 
         <div className="flex gap-4">
+          {/* Add Expense — coral pastel with diagonal dot pattern */}
           <button
             onClick={onAddExpense}
-            className="h-[160px] w-36 bg-bunq text-black rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-bunq/20 group"
+            className="h-[160px] w-36 rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg group relative overflow-hidden"
+            style={{ background: '#fddde6' }}
           >
-            <div className="p-3 bg-black/10 rounded-2xl group-hover:bg-black/20 transition-colors">
-              <ArrowUpRight className="w-8 h-8" />
+            {/* dot grid pattern */}
+            <div className="absolute inset-0 opacity-20"
+              style={{
+                backgroundImage: 'radial-gradient(circle, #e63946 1.5px, transparent 1.5px)',
+                backgroundSize: '14px 14px',
+              }} />
+            <div className="relative z-10 flex flex-col items-center gap-3">
+              <div className="p-3 rounded-2xl" style={{ background: 'rgba(230,57,70,0.15)' }}>
+                <ArrowUpRight className="w-8 h-8" style={{ color: '#c0394a' }} />
+              </div>
+              <span className="font-bold text-sm tracking-tight" style={{ color: '#9b2233' }}>Add Expense</span>
             </div>
-            <span className="font-bold text-sm tracking-tight">Add Expense</span>
           </button>
+
+          {/* Add Funds — mint pastel with diagonal stripe pattern */}
           <button
             onClick={handleAddFunds}
             disabled={funding}
-            className="h-[160px] w-36 bg-card border border-zinc-800 rounded-[24px] flex flex-col items-center justify-center gap-3 hover:bg-zinc-800/50 transition-all active:scale-95 group disabled:opacity-50"
+            className="h-[160px] w-36 rounded-[24px] flex flex-col items-center justify-center gap-3 transition-all hover:scale-105 active:scale-95 shadow-lg group relative overflow-hidden disabled:opacity-60"
+            style={{ background: '#d4f5ed' }}
           >
-            <div className="p-3 bg-white/5 rounded-2xl group-hover:bg-white/10 transition-colors">
-              {funding
-                ? <div className="w-8 h-8 border-2 border-bunq border-t-transparent rounded-full animate-spin" />
-                : <Plus className="w-8 h-8 text-bunq" />
-              }
+            {/* diagonal stripe pattern */}
+            <div className="absolute inset-0 opacity-20"
+              style={{
+                backgroundImage: 'repeating-linear-gradient(45deg, #43aa8b 0px, #43aa8b 1.5px, transparent 1.5px, transparent 12px)',
+              }} />
+            <div className="relative z-10 flex flex-col items-center gap-3">
+              <div className="p-3 rounded-2xl" style={{ background: 'rgba(67,170,139,0.15)' }}>
+                {funding
+                  ? <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#2d8a6e', borderTopColor: 'transparent' }} />
+                  : <Plus className="w-8 h-8" style={{ color: '#2d7a62' }} />
+                }
+              </div>
+              <span className="text-sm font-bold tracking-tight text-center leading-tight px-1" style={{ color: '#1e5c49' }}>
+                {fundingStatus ?? 'Add Funds'}
+              </span>
             </div>
-            <span className="text-sm font-bold text-zinc-300 tracking-tight text-center leading-tight px-1">
-              {fundingStatus ?? 'Add Funds'}
-            </span>
           </button>
         </div>
       </div>

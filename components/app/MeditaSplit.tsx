@@ -227,7 +227,6 @@ export const MeditaSplit: React.FC = () => {
             <GroupChat
               group={selectedGroup}
               onBack={() => setSelectedGroup(null)}
-              onOpenAddExpense={openAddExpense}
               onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
             />
           )}
