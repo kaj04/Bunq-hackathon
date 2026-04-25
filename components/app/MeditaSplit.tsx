@@ -19,6 +19,7 @@ export const MeditaSplit: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([])
   const [memberAliases, setMemberAliases] = useState<{ name: string; userId: number; alias: string }[]>([])
   const [currentUser, setCurrentUser] = useState('Me')
+  const [currentUserAlias, setCurrentUserAlias] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchGroups = useCallback(async () => {
@@ -41,7 +42,10 @@ export const MeditaSplit: React.FC = () => {
       ])
       const [membersData, meData] = await Promise.all([membersRes.json(), meRes.json()])
       if (membersData.success) setMemberAliases(membersData.data)
-      if (meData.success) setCurrentUser(meData.data.name)
+      if (meData.success) {
+        setCurrentUser(meData.data.name)
+        if (meData.data.alias) setCurrentUserAlias(meData.data.alias)
+      }
     } catch { /* keep placeholders */ }
   }, [])
 
@@ -127,6 +131,22 @@ export const MeditaSplit: React.FC = () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newGroup),
     })
+    fetchGroups()
+  }
+
+  const handleDeleteGroup = async (groupId: string) => {
+    try {
+      const [r1, r2] = await Promise.all([
+        fetch(`/api/groups/${groupId}`, { method: 'DELETE' }),
+        fetch(`/api/groups/${groupId}/chat`, { method: 'DELETE' }),
+      ])
+      const [d1, d2] = await Promise.all([r1.json(), r2.json()])
+      if (!d1.success) console.error('Delete group failed:', d1)
+      if (!d2.success) console.error('Delete chat failed:', d2)
+    } catch (e) {
+      console.error('handleDeleteGroup error:', e)
+    }
+    setSelectedGroup(null)
     fetchGroups()
   }
 
@@ -222,11 +242,14 @@ export const MeditaSplit: React.FC = () => {
 
           {activeTab === 'groups' && selectedGroup && (
             <GroupChat
+              key={selectedGroup.id}
               group={selectedGroup}
               currentUser={currentUser}
+              currentUserAlias={currentUserAlias}
               onBack={() => setSelectedGroup(null)}
               availableContacts={memberAliases.map(m => ({ name: m.name, alias: m.alias }))}
               onUpdateGroup={handleUpdateGroup}
+              onDeleteGroup={() => handleDeleteGroup(selectedGroup.id)}
               onExpenseAdded={(expense) => handleGroupExpenseAdded(selectedGroup.id, expense)}
             />
           )}

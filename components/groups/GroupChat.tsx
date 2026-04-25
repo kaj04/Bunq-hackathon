@@ -6,9 +6,11 @@ import { Group, GroupExpense, ChatMessage, GroupMember } from '@/types/designer'
 interface GroupChatProps {
   group: Group
   currentUser: string
+  currentUserAlias: string | null
   onBack: () => void
   availableContacts: GroupMember[]
   onUpdateGroup: (updated: Group) => void
+  onDeleteGroup?: () => void
   onExpenseAdded?: (expense: GroupExpense) => void
 }
 
@@ -25,8 +27,9 @@ const WELCOME_MESSAGE = (groupName: string): ChatMessage => ({
   timestamp: new Date().toISOString(),
 })
 
-export const GroupChat: React.FC<GroupChatProps> = ({ group, currentUser, onBack, availableContacts, onUpdateGroup, onExpenseAdded }) => {
+export const GroupChat: React.FC<GroupChatProps> = ({ group, currentUser, currentUserAlias, onBack, availableContacts, onUpdateGroup, onDeleteGroup, onExpenseAdded }) => {
   const [showSettings, setShowSettings] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [addName, setAddName] = useState('')
   const [addEmail, setAddEmail] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE(group.name)])
@@ -138,10 +141,11 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, currentUser, onBack
         const resolvedSplits = splits
           .map((s: any) => {
             const name: string = s.participant?.name ?? s.name ?? ''
-            if (!name || name.toLowerCase() === 'sugar daddy') return null
+            if (!name || name === currentUser || name.toLowerCase() === 'sugar daddy') return null
             const member = group.members.find(m => m.name === name)
             const alias = member?.alias ?? null
             if (!alias || !alias.includes('@')) return null
+            if (currentUserAlias && alias === currentUserAlias) return null
             return { name, alias, amount: s.amount }
           })
           .filter(Boolean) as { name: string; alias: string; amount: number }[]
@@ -407,6 +411,38 @@ export const GroupChat: React.FC<GroupChatProps> = ({ group, currentUser, onBack
                   </div>
                 </div>
               </div>
+
+              {/* Delete group */}
+              {onDeleteGroup && (
+                <div className="pt-4 border-t border-zinc-800">
+                  {!confirmDelete ? (
+                    <button
+                      onClick={() => setConfirmDelete(true)}
+                      className="w-full py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm font-semibold hover:bg-rose-500/20 transition-colors"
+                    >
+                      Delete Group
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-xs text-zinc-400 text-center">Remove for all members?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setConfirmDelete(false)}
+                          className="flex-1 py-2 rounded-2xl bg-zinc-800 text-zinc-300 text-sm font-semibold hover:bg-zinc-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => { setConfirmDelete(false); onDeleteGroup() }}
+                          className="flex-1 py-2 rounded-2xl bg-rose-500 text-white text-sm font-semibold hover:bg-rose-600 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

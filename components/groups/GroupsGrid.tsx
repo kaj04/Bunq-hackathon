@@ -1,5 +1,5 @@
 'use client'
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Plus, Users, ArrowRight, Check, UserPlus } from 'lucide-react'
 import { Group } from '@/types/designer'
 
@@ -22,12 +22,6 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
   const [manualName, setManualName] = useState('')
   const [manualEmail, setManualEmail] = useState('')
 
-  useEffect(() => {
-    if (isCreating) {
-      setSelectedNames(new Set(availableContacts.map(c => c.name)))
-      setManualMembers([])
-    }
-  }, [isCreating, availableContacts])
 
   const toggleMember = (name: string) => {
     setSelectedNames(prev => {
@@ -72,7 +66,7 @@ export const GroupsGrid: React.FC<GroupsGridProps> = ({ groups, availableContact
           <h2 className="text-3xl font-bold tracking-tight">Your Groups</h2>
           <p className="text-white/40">Manage your shared expenses with friends</p>
         </div>
-        <button onClick={() => setIsCreating(true)} className="btn-primary">
+        <button onClick={() => { setSelectedNames(new Set(availableContacts.map(c => c.name))); setManualMembers([]); setIsCreating(true) }} className="btn-primary">
           <Plus size={20} /> New Group
         </button>
       </div>
